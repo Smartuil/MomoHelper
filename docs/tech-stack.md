@@ -2,15 +2,14 @@
 
 ## 总体架构
 
-项目采用 Web + 微信小程序 + EdgeOne 后端函数 + 共享业务包的 monorepo 架构。
+项目采用 Web + 微信小程序 + 独立服务器后端 + 共享业务包的 monorepo 架构。
 
 ```text
 apps/web
 apps/miniprogram
+apps/server                   （独立服务器，唯一业务后端）
         |
 packages/api-client
-        |
-cloud-functions/api
         |
 packages/maimemo
 packages/ai
@@ -23,8 +22,9 @@ packages/db
 - Web 和小程序是两个前端入口。
 - 后端 API 统一承载墨墨 API、AI API、数据库和权限控制。
 - 业务逻辑尽量沉到 packages，避免 Web、小程序、后端各写一套。
-- EdgeOne 负责部署前端、Cloud Functions 和轻量 Edge Functions。
-- 独立服务器可作为后续扩展，用于队列、定时任务、长任务和复杂分析。
+- 独立服务器部署 Nginx、Node 单进程和 PostgreSQL，承载全部业务。
+- 不使用 EdgeOne；未来需要防护或 CDN 时作为纯接入层叠加，不影响业务代码。
+- 详细部署方案见 `architecture.md`。
 
 ## 前端
 
@@ -49,11 +49,12 @@ packages/db
 - 云词本管理
 - AI 问词助手
 - 文本生词提取
+- 学习词汇词云
 - 每日 / 每周 / 每月报告
 
 说明：
 
-- Next.js 适合部署到 EdgeOne Pages。
+- Next.js 建议使用静态导出（`output: 'export'`），构建产物由 Nginx 托管，不额外占用 Node 进程。
 - TanStack Query 负责服务端数据请求、缓存和刷新。
 - Zustand 负责少量本地状态，比如当前选中的词本、筛选条件、UI 状态。
 - shadcn/ui 适合快速搭建干净的工具型界面。
@@ -90,50 +91,45 @@ packages/db
 
 ## 后端
 
-### EdgeOne Cloud Functions
+### 独立服务器（唯一业务后端）
 
 推荐技术栈：
 
-- Node.js 20
+- Node.js 24（Active LTS）
 - TypeScript
-- Hono 或轻量自定义路由
+- Hono
 - Zod
 
-用途：
+进程模型：**单进程三模块**
 
-- 用户鉴权
-- 墨墨 Open API 代理
-- AI API 调用
-- 数据库访问
-- Token 加密和解密
-- 今日学习数据聚合
-- 遗忘词分析
-- 易混词诊断
-- 云词本创建
-- 学习计划写入
-- 每日复盘生成
+| 模块 | 职责 |
+| --- | --- |
+| HTTP API | 用户鉴权、墨墨 Open API 代理、AI 调用、数据库访问、Token 加解密 |
+| Queue Worker | 批量写入队列消费、配额记账、频控等待、失败重试 |
+| Scheduler | 每日快照、队列续跑、周报月报、Token 过期巡检 |
 
 说明：
 
-- Cloud Functions 是第一阶段主后端。
-- 比 Edge Functions 更适合业务逻辑、数据库访问和 AI 调用。
-- 后续可以把重任务迁移到独立服务器，保持 API 层不变。
+- 一个进程内承载三模块，通过环境变量控制启停（本地开发只开 API）。
+- 2 核 2G 规格下拆多进程只会浪费内存，且 2 核本来跑不了多少并发。
+- 必须实现优雅关闭：SIGTERM 时先停 Scheduler，等 Worker 完成当前任务，再关 HTTP Server。
+- 墨墨 API 出口、Token 解密、配额记账三者的唯一性都在此成立。
 
-### EdgeOne Edge Functions
+### Nginx（接入层）
 
 推荐用途：
 
-- 简单鉴权
-- 请求限流
-- 静态缓存
-- 路由转发
-- Header 处理
-- 轻量 API 网关逻辑
+- TLS 终结与证书自动续期（certbot）
+- 静态资源托管与长缓存
+- `/api/*` 反向代理到 Node
+- `limit_req` 限流保护
+- SSE 透传（AI 流式接口需关闭 `proxy_buffering`）
+- 安全响应头
 
 说明：
 
-- Edge Functions 不适合复杂 AI 分析、批量任务或数据库重操作。
-- 只放轻量、低延迟、靠近用户的逻辑。
+- Nginx 不承载任何业务逻辑。
+- 只对外暴露 443；Node 与 PostgreSQL 均只监听 `127.0.0.1`。
 
 ## 数据库
 
@@ -162,23 +158,23 @@ packages/db
 
 选型建议：
 
-- 如果想快速上线，使用 Supabase 或 Neon。
-- 如果更偏国内部署和稳定访问，使用腾讯云数据库或自建 PostgreSQL。
-- 如果你已有独立服务器，也可以先自建 PostgreSQL。
+- 第一版使用**独立服务器自建 PostgreSQL**，与 Worker 同机，延迟最低。
+- 数据量或可用性要求提升后，再迁移到腾讯云数据库 PostgreSQL（`pg_dump` 平滑迁移）。
+- 无论自建还是托管，数据库都必须仅监听本机 / 内网，不暴露公网。
 
 ## 缓存与队列
 
-第一阶段：
+第一版：
 
-- 可以暂时不引入队列
-- 使用数据库记录任务状态
-- 使用 EdgeOne KV 做轻量缓存和限流计数
+- **不引入 Redis**：单进程单出口，限流计数放进程内存即可。
+- **不引入消息队列中间件**：用 PostgreSQL 表记录任务状态，进程内串行调度。
+- 队列全局并发限制为 2（保护 2 核 2G 规格）。
 
 后续扩展：
 
-- Redis
+- Redis（多进程 / 多机后才需要，用于共享限流计数与分布式锁）
 - BullMQ
-- 独立 Worker
+- 独立 Worker 进程或独立机器
 
 适用场景：
 
@@ -283,40 +279,39 @@ packages/db
 
 ## 部署
 
-### 第一阶段
+### 第一版
 
-推荐：
-
-- EdgeOne Pages 部署 Web
-- EdgeOne Cloud Functions 部署 API
-- EdgeOne Edge Functions 做轻量网关能力
-- PostgreSQL 使用云服务或自建
+- Nginx（宿主机）：TLS、静态资源、反向代理、限流
+- Node 单进程（Docker）
+- PostgreSQL 16（Docker，仅监听 `127.0.0.1`）
+- certbot 自动续期证书
+- 备份：每日 `pg_dump` 推送腾讯云 COS
 
 ### 后续扩展
 
 可加入：
 
-- 独立服务器
 - Redis
-- Worker
-- 定时任务
+- 独立 Worker 进程
 - 日志系统
 - 监控报警
+- 腾讯云托管 PostgreSQL
 
 演进方式：
 
 ```text
-第一阶段：
-EdgeOne Pages + Cloud Functions + PostgreSQL
+第一版：
+单机（Nginx + Node + PostgreSQL）
 
-第二阶段：
-EdgeOne 继续作为前端和 API 入口
-独立服务器承载 Worker、队列、定时任务
+第二版：
+应用与数据库分离
+或数据库迁移到腾讯云托管
 
-第三阶段：
-核心业务后端可迁移到独立服务器
-EdgeOne 负责前端、CDN、API 网关和边缘逻辑
+第三版：
+多实例 + 负载均衡 + Redis 共享状态
 ```
+
+说明：本方案不涉及 EdgeOne。若后续需要 CDN 或攻击防护，把 EdgeOne 作为纯接入层叠加即可，业务代码无需改动（前提是遵守 `architecture.md` 第 10 节的编码约定）。
 
 ## 推荐第一版组合
 
@@ -327,24 +322,26 @@ EdgeOne 负责前端、CDN、API 网关和边缘逻辑
 - UI：Tailwind CSS 最新稳定版 + shadcn/ui
 - 数据请求：TanStack Query 最新稳定版
 - 小程序：Taro 最新稳定版 + React 最新稳定版 + TypeScript 最新稳定版
-- 后端：EdgeOne Cloud Functions + 平台支持的最新 Node.js 运行时 + TypeScript 最新稳定版
+- 后端：独立服务器 + Node.js 24 Active LTS + TypeScript 最新稳定版
 - 路由：Hono 最新稳定版
+- 反向代理：Nginx 最新稳定版
+- 容器：Docker + Docker Compose
 - 校验：Zod 最新稳定版
-- 数据库：PostgreSQL
+- 数据库：PostgreSQL 16（本机自建）
 - ORM：Drizzle 最新稳定版，或 Prisma 当前稳定 ORM 版本
 - AI：统一封装在 `packages/ai`
 - 墨墨 API：统一封装在 `packages/maimemo`
 
 ## 版本策略
 
-项目希望所有技术栈尽量使用最新稳定版，但需要区分“依赖包最新稳定版”和“部署平台支持的最新运行时”。
+项目希望所有技术栈尽量使用最新稳定版，但需要区分"依赖包最新稳定版"和"部署平台支持的最新运行时"。
 
 建议策略：
 
 - 应用依赖默认使用最新稳定版，不使用 alpha、beta、canary、rc，除非有明确原因。
 - Node.js 本地开发优先使用当前 Active LTS。
-- EdgeOne Cloud Functions 运行时以 EdgeOne 官方当前支持版本为准。
-- 如果 EdgeOne Cloud Functions 的 Node.js 版本落后于 Node.js 官方 LTS，需要在本地开发和 CI 中保留兼容检查。
+- 服务器运行时使用 Node.js 当前 Active LTS，本地开发与生产保持一致。
+- 不再受 FaaS 运行时版本限制，可直接使用官方 LTS，无需兼容降级。
 - Prisma 需要谨慎处理版本。若 Prisma 最新 `latest` 指向 RC 或新 CLI 体系，第一版优先使用当前稳定 ORM 版本，避免迁移命令和客户端生成流程不稳定。
 - 依赖版本应在 `package.json` 中锁定主版本，避免无意升级造成构建或运行时差异。
 
@@ -360,7 +357,7 @@ EdgeOne 负责前端、CDN、API 网关和边缘逻辑
 | Hono | 使用 `4.x` 最新稳定版 |
 | Zod | 使用 `4.x` 最新稳定版 |
 | Node.js 本地开发 | 优先使用 `24.x` Active LTS |
-| EdgeOne Cloud Functions | 以 EdgeOne 当前支持的 `Node.js v20.x` 为准 |
+| 服务器运行时 | 使用 `24.x` Active LTS，与本地开发一致 |
 | Prisma | 优先使用稳定 ORM 版本，不直接追 RC |
 | Drizzle | 可作为第一版 ORM 首选，使用最新稳定版 |
 

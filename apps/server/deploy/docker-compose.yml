@@ -1,0 +1,31 @@
+# 仅用于 PostgreSQL。
+#
+# Node 服务不放进容器：monorepo 的 workspace 依赖在容器内需要多阶段构建，
+# 收益低而复杂度高。改用 systemd 直接运行（见 momohelper-api.service）。
+#
+# 使用方式：
+#   cd apps/server/deploy
+#   docker compose --env-file ../.env up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: momo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须设置}
+      POSTGRES_DB: momohelper
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+      - ../config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    # 关键：绑定 127.0.0.1，而非 0.0.0.0
+    ports:
+      - "127.0.0.1:5432:5432"
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U momo -d momohelper"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

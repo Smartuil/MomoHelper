@@ -1,0 +1,35 @@
+# systemd 服务单元：Node 单进程（API + Worker + Scheduler）
+#
+# 安装：
+#   sudo cp momohelper-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now momohelper-api
+#
+# 日志：journalctl -u momohelper-api -f
+
+[Unit]
+Description=MomoHelper API (Node single process)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=momo
+WorkingDirectory=/opt/momohelper/apps/server
+
+EnvironmentFile=/opt/momohelper/apps/server/.env
+# Node 堆上限：让 Node 自己 GC，而不是被系统 OOM Killer 杀掉
+Environment=NODE_OPTIONS=--max-old-space-size=512
+
+ExecStart=/usr/bin/node dist/index.js
+
+Restart=always
+RestartSec=5
+
+# 优雅关闭：给 30 秒等 Worker 完成进行中的写入任务。
+# 硬中断会让正在写入墨墨的任务状态不一致，勿缩短该值。
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
