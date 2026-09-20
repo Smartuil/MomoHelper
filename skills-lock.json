@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "markji-card-syntax": {
+      "source": "maimemo/memo-skills",
+      "sourceType": "github",
+      "skillPath": "markji-card-syntax/SKILL.md",
+      "computedHash": "88d63f9be49d1a8959606389ae35c4e7e5926574f4165b7967f55665dd190786"
+    },
+    "memo-api": {
+      "source": "maimemo/memo-skills",
+      "sourceType": "github",
+      "skillPath": "memo-api/SKILL.md",
+      "computedHash": "513d8604f032d2faa2b0fd1f4f54766eda49fc7902d3b73cebc35c4d1340c916"
+    }
+  }
+}
