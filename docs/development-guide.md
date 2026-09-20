@@ -45,7 +45,7 @@ Node 单进程
   ├─ Queue Worker  写入队列（并发 2）
   └─ Scheduler     定时任务
       │
-      ├─> PostgreSQL 16（本机 127.0.0.1:5432）
+      ├─> PostgreSQL 18（宝塔实例 127.0.0.1:5432）
       ├─> 墨墨 Open API（唯一出口）
       └─> DeepSeek API
 ```
@@ -89,10 +89,10 @@ Node 单进程
 | 小程序 | Taro | 4.x |
 | 后端框架 | Hono | 4.x |
 | 校验 | Zod | 4.x |
-| 数据库 | PostgreSQL | 16 |
+| 数据库 | PostgreSQL | 18（宝塔既有实例） |
 | ORM | Drizzle | 最新稳定版 |
 | AI | DeepSeek（OpenAI 兼容协议） | `deepseek-chat` / `deepseek-reasoner` |
-| 部署 | Nginx + systemd + Docker Compose | — |
+| 部署 | 宝塔 Nginx + systemd | OpenCloudOS 9.4，PG/Nginx/Node 复用宝塔组件 |
 
 **版本规则**：应用依赖用最新稳定版，不用 alpha/beta/rc/canary。`package.json` 锁定主版本。
 
@@ -200,7 +200,7 @@ const exists = Boolean(response.data.voc?.length)
 | `ENABLE_API` | 否 | `true` | 本地开发可只开 API |
 | `ENABLE_WORKER` | 否 | `true` | — |
 | `ENABLE_SCHEDULER` | 否 | `true` | — |
-| `WORKER_CONCURRENCY` | 否 | `2` | 队列并发，上限 4 |
+| `WORKER_CONCURRENCY` | 否 | `1` | 队列并发，1G 内存机器上限 2 |
 
 主密钥生成：
 
@@ -230,6 +230,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 | `union_id` | text unique | 微信 unionid |
 | `open_id_web` | text unique null | Web 扫码登录 openid |
 | `open_id_mp` | text unique null | 小程序 openid |
+| `maimemo_sub` | text unique null | 墨墨 OIDC 用户标识（`id_token.payload.sub`），为开放平台授权登录预留；个人 token 阶段为空 |
 | `nickname` | text null | — |
 | `avatar_url` | text null | — |
 
@@ -240,13 +241,23 @@ Token 只存密文。字段与 `apps/server/src/security/crypto.ts` 的 `Encrypt
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `user_id` | uuid PK | 一用户一条 |
+| `credential_type` | text | `MANUAL`（个人 token 粘贴）/ `OIDC`（开放平台授权登录），现阶段只产生 `MANUAL` |
 | `ciphertext` | text | AES-256-GCM 密文 |
 | `iv` | text | 12 字节随机 nonce |
 | `auth_tag` | text | 16 字节认证标签 |
+| `refresh_ciphertext` | text null | refresh token 密文，仅 `OIDC` 使用，用于静默续期；`MANUAL` 为空 |
+| `refresh_iv` | text null | 仅 `OIDC` |
+| `refresh_auth_tag` | text null | 仅 `OIDC` |
 | `key_version` | int | 密钥轮换 |
 | `token_status` | text | `ACTIVE` / `EXPIRED` / `INVALID` |
-| `token_expires_at` | timestamptz | 按 7 天有效期记录（C10） |
+| `token_expires_at` | timestamptz | `MANUAL` 按 7 天有效期记录（C10）；`OIDC` 记录 access token 过期时间，refresh 续期后同步更新 |
 | `last_verified_at` | timestamptz null | 最近校验成功时间 |
+
+OIDC 预留说明（接入墨墨开放平台后启用，当前实现只需支持 `MANUAL`）：
+
+- access token 与 refresh token 的 AAD 分别为 `user_id + ':access'` 与 `user_id + ':refresh'`，防止两类密文互换；`crypto.ts` 现以 `user_id` 单独作 AAD，接入 OIDC 时同步扩展。
+- refresh 调用失败（refresh token 已失效）→ `token_status = EXPIRED`，引导用户重新授权，不自动重试。
+- 两类凭证共用同一主密钥 `MAIMEMO_TOKEN_KEY`，轮换仍靠 `key_version`。
 
 ### 6.3 `user_preferences`
 
@@ -587,7 +598,7 @@ PENDING → RUNNING → DONE
 8. 限流等待（遵守 C9）
 ```
 
-**并发**：全局 `WORKER_CONCURRENCY`（默认 2），进程内串行调度。
+**并发**：全局 `WORKER_CONCURRENCY`（默认 1），进程内串行调度。
 
 ### 7.7 `apps/server/src/scheduler` — 定时任务
 
@@ -868,7 +879,7 @@ PENDING → RUNNING → DONE
 | 编号 | 任务 | 交付物 |
 | --- | --- | --- |
 | T01 | 校验 workspace | `pnpm install` 通过，`pnpm -r typecheck` 无报错 |
-| T02 | 启动 PostgreSQL | 容器运行，`127.0.0.1:5432` 可连，`server/config/postgresql.conf` 生效 |
+| T02 | 准备 PostgreSQL | 复用宝塔 PG 18 实例：建 `momo` 用户与 `momohelper` 库，`127.0.0.1:5432` 连通，调参生效 |
 | T03 | 实现 `packages/types` | 共享类型定义（API 请求响应、枚举） |
 | T04 | 实现 `packages/db` | Drizzle schema（13 张表）+ 首个迁移 + `db` 实例 |
 | T05 | 完善 `apps/server` 骨架 | 环境变量校验、健康检查、优雅关闭可用 |

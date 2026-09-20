@@ -786,8 +786,8 @@ economic / economical
 
 | 编号 | 实体 | 用途 | 关键字段（示意） |
 | --- | --- | --- | --- |
-| DR-1 | `users` | 平台用户 | id、openid、创建时间 |
-| DR-2 | `maimemo_credentials` | Token 加密存储 | user_id、encrypted_token、status、expires_at、last_verified_at |
+| DR-1 | `users` | 平台用户 | id、openid、maimemo_sub、创建时间 |
+| DR-2 | `maimemo_credentials` | Token 加密存储 | user_id、credential_type、ciphertext、refresh_ciphertext、token_status、token_expires_at、last_verified_at |
 | DR-3 | `user_preferences` | 写入权限与偏好 | user_id、allow_interpretation/phrase/note/notepad/study_plan |
 | DR-4 | `daily_study_snapshots` | 每日快照（FR-15.1） | user_id、date、finished、total、study_time、captured_at |
 | DR-5 | `content_write_jobs` | 写入任务（FR-15.2） | user_id、type、total、done、status、scheduled_date |
@@ -815,18 +815,22 @@ Token 分三层存放，任一层单独泄露都不足以还原明文：
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `user_id` | uuid | 主键 |
+| `credential_type` | text | `MANUAL`（个人 token 粘贴）/ `OIDC`（开放平台授权登录），现阶段仅 `MANUAL` |
 | `ciphertext` | text | AES-256-GCM 密文（base64） |
 | `iv` | text | 12 字节随机 nonce，每次写入重新生成 |
 | `auth_tag` | text | 16 字节认证标签 |
+| `refresh_ciphertext` | text null | refresh token 密文，仅 `OIDC` 使用，用于静默续期，解决 C10 的 7 天重绑摩擦 |
+| `refresh_iv` / `refresh_auth_tag` | text null | 仅 `OIDC` |
 | `key_version` | int | 支持密钥轮换，新旧密钥共存，避免全表重加密 |
 | `token_status` | text | `ACTIVE` / `EXPIRED` / `INVALID` |
-| `token_expires_at` | timestamp | 按 7 天有效期记录（C10），用于 FR-1.3 过期提醒 |
+| `token_expires_at` | timestamp | `MANUAL` 按 7 天有效期记录（C10），用于 FR-1.3 过期提醒；`OIDC` 记录 access token 过期时间，refresh 后更新 |
 | `last_verified_at` | timestamp | 最近一次校验成功时间 |
 | `created_at` / `updated_at` | timestamp | — |
 
 实现约束：
 
-- 加密算法固定为 AES-256-GCM；每次写入生成新 IV；以 `user_id` 作为 AAD，防止密文被跨用户替换。
+- 加密算法固定为 AES-256-GCM；每次写入生成新 IV；AAD 为 `user_id + 用途`（access / refresh 各自独立），防止密文被跨用户或跨字段替换。
+- OIDC 路径为预留设计（接入墨墨开放平台后启用）：refresh 失败即标记 `EXPIRED` 并引导重新授权，不自动重试；refresh token 明文与密文不落日志、不下发前端。
 - 加解密函数只允许在服务器 Node 进程内调用，封装在 `packages/core`（后端专用入口），前端与小程序不得引入。
 - 未通过 FR-1.2 有效性校验的 Token **不落库**（对应 AC-1.2）。
 - 解绑时物理删除该行（对应 FR-1.7）。
@@ -846,8 +850,8 @@ Token 分三层存放，任一层单独泄露都不足以还原明文：
 - 接入层：Nginx 负责 TLS、静态资源、反向代理与限流，不承载业务逻辑。
 - 墨墨封装：`packages/maimemo`，**以真机实测为准**，不以 `memo-api` 技能文档为准（该文档已发现 4 处与线上不符）。
 - AI 封装：`packages/ai`，由服务器直连 DeepSeek。
-- 数据库：PostgreSQL 16 本机自建（Drizzle 或稳定版 Prisma）。
-- 部署：全部业务在独立服务器（2 核 2G + 200Mbps），不使用 EdgeOne（详见 9.1 与 `architecture.md`）。
+- 数据库：PostgreSQL 18 本机自建（宝塔既有实例，Drizzle）。
+- 部署：全部业务在独立服务器（2 核 1G + 1G swap + 200Mbps），不使用 EdgeOne（详见 9.1 与 `architecture.md`）。
 - 关键实现细节（必须遵守）：
   - 响应统一包裹在 `data` 中。
   - `Vocabulary` 只有 `id` 与 `spelling`。
@@ -857,7 +861,7 @@ Token 分三层存放，任一层单独泄露都不足以还原明文：
 
 ### 9.1 部署分工（已确认）
 
-运行环境为单台独立服务器（腾讯云锐驰型 2 核 2G + 200Mbps 不限流量），**不使用 EdgeOne**。
+运行环境为单台独立服务器（腾讯云轻量 2 核 1G + 1G swap + 200Mbps 不限流量，OpenCloudOS 9.4 + 宝塔面板），**不使用 EdgeOne**。
 
 | 能力 | 落点 | 理由 |
 | --- | --- | --- |
@@ -865,10 +869,10 @@ Token 分三层存放，任一层单独泄露都不足以还原明文：
 | HTTP API（鉴权 / 数据 / AI / 墨墨代理） | Node 单进程 | 业务唯一入口 |
 | 墨墨 API 出口 | Node 单进程 | C9 频控是账号级，出口唯一才能集中限流 |
 | Token 加解密 | Node 单进程 | 密钥只在一处 |
-| 写入队列 Worker | Node 单进程（并发 2） | C4 配额单点记账 |
+| 写入队列 Worker | Node 单进程（并发 1） | C4 配额单点记账 |
 | 定时任务（快照 / 续跑 / 报告 / Token 巡检） | Node 单进程（node-cron） | 需要常驻进程 |
 | AI 调用（交互式 + 批量） | Node 单进程直连 DeepSeek | 国内直连无网络问题，无需边缘代理 |
-| PostgreSQL 16 | 服务器本机（127.0.0.1） | 与 Worker 同机，延迟最低 |
+| PostgreSQL 18 | 服务器本机（宝塔实例，127.0.0.1） | 与 Worker 同机延迟最低，免容器省内存 |
 | Redis | **不部署** | 单进程单出口，限流计数放进程内存即可 |
 
 设计原则：
@@ -876,7 +880,7 @@ Token 分三层存放，任一层单独泄露都不足以还原明文：
 1. **墨墨 API 出口唯一**。所有墨墨调用只从这一个进程发出，`packages/maimemo` 仅在此运行。这是 C9 成立的前提——多出口会导致各自的限流计数器都不超限，合计却超限。
 2. **配额记账唯一**。C4 的 600 条/天必须单点记账，避免并发任务超额写入。
 3. **Token 解密唯一**。主密钥只配置在一处，不分散到多个运行环境。
-4. **单进程承载三模块**。2 核 2G 规格下拆多进程只浪费内存；必须实现优雅关闭（先停 Scheduler，等 Worker 完成当前任务，再关 HTTP）。
+4. **单进程承载三模块**。2 核 1G 规格下拆多进程只浪费内存；必须实现优雅关闭（先停 Scheduler，等 Worker 完成当前任务，再关 HTTP）。
 5. **不引入 Redis 与消息队列中间件**。任务量与并发度都用不上；需要时再引入，迁移成本低。
 
 资源预算、部署步骤、PostgreSQL 调参、编码约定见 `docs/architecture.md`。

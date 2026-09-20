@@ -111,7 +111,7 @@ packages/db
 说明：
 
 - 一个进程内承载三模块，通过环境变量控制启停（本地开发只开 API）。
-- 2 核 2G 规格下拆多进程只会浪费内存，且 2 核本来跑不了多少并发。
+- 2 核 1G 规格下拆多进程只会浪费内存，且 2 核本来跑不了多少并发。
 - 必须实现优雅关闭：SIGTERM 时先停 Scheduler，等 Worker 完成当前任务，再关 HTTP Server。
 - 墨墨 API 出口、Token 解密、配额记账三者的唯一性都在此成立。
 
@@ -158,7 +158,7 @@ packages/db
 
 选型建议：
 
-- 第一版使用**独立服务器自建 PostgreSQL**，与 Worker 同机，延迟最低。
+- 第一版使用**独立服务器自建 PostgreSQL 18**（宝塔既有实例，免容器省内存），与 Worker 同机，延迟最低。
 - 数据量或可用性要求提升后，再迁移到腾讯云数据库 PostgreSQL（`pg_dump` 平滑迁移）。
 - 无论自建还是托管，数据库都必须仅监听本机 / 内网，不暴露公网。
 
@@ -168,7 +168,7 @@ packages/db
 
 - **不引入 Redis**：单进程单出口，限流计数放进程内存即可。
 - **不引入消息队列中间件**：用 PostgreSQL 表记录任务状态，进程内串行调度。
-- 队列全局并发限制为 2（保护 2 核 2G 规格）。
+- 队列全局并发限制为 1（保护 2 核 1G 规格）。
 
 后续扩展：
 
@@ -281,10 +281,10 @@ packages/db
 
 ### 第一版
 
-- Nginx（宿主机）：TLS、静态资源、反向代理、限流
-- Node 单进程（Docker）
-- PostgreSQL 16（Docker，仅监听 `127.0.0.1`）
-- certbot 自动续期证书
+- Nginx（宝塔管理）：TLS、静态资源、反向代理、限流
+- Node 单进程（systemd，使用宝塔 Node 24）
+- PostgreSQL 18（宝塔既有实例，仅监听 `127.0.0.1`）
+- 证书：宝塔或 certbot 自动续期
 - 备份：每日 `pg_dump` 推送腾讯云 COS
 
 ### 后续扩展
@@ -325,9 +325,9 @@ packages/db
 - 后端：独立服务器 + Node.js 24 Active LTS + TypeScript 最新稳定版
 - 路由：Hono 最新稳定版
 - 反向代理：Nginx 最新稳定版
-- 容器：Docker + Docker Compose
+- 容器：Docker（按需使用，PG 不再容器化）
 - 校验：Zod 最新稳定版
-- 数据库：PostgreSQL 16（本机自建）
+- 数据库：PostgreSQL 18（本机自建，宝塔实例）
 - ORM：Drizzle 最新稳定版，或 Prisma 当前稳定 ORM 版本
 - AI：统一封装在 `packages/ai`
 - 墨墨 API：统一封装在 `packages/maimemo`

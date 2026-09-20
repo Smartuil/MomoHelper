@@ -16,10 +16,10 @@
 
 | 编号 | 决策 | 理由 |
 | --- | --- | --- |
-| D1 | **全部业务部署在独立服务器**，不使用 EdgeOne | 2核2G + 200Mbps 不限流量足以支撑目标规模；少一层就少一处排查 |
+| D1 | **全部业务部署在独立服务器**，不使用 EdgeOne | 1G 内存 + 1G swap + 200Mbps 不限流量足以支撑目标规模；少一层就少一处排查 |
 | D2 | **不使用 Redis** | 单进程单出口，限流计数放进程内存即可；墨墨频控平均 9 秒 1 次，无并发压力 |
 | D3 | **Node 单进程**承载 API + Queue Worker + Scheduler | 省内存；2 核本来也跑不了多少并发 |
-| D4 | **PostgreSQL 16 本机自建**，仅监听 `127.0.0.1` | 与 Worker 同机延迟最低；规模未到需托管的程度 |
+| D4 | **PostgreSQL 18（宝塔既有实例）**，仅监听 `127.0.0.1` | 复用宝塔已装实例，1G 内存下免容器省资源；规模未到需托管的程度 |
 | D5 | **AI 由服务器直连 DeepSeek** | 国内直连无网络问题，无需边缘代理 |
 | D6 | **EdgeOne 不参与运行链路**，未来按需作为纯防护层接入 | 带宽充裕，CDN 与边缘计算均无必要 |
 | D7 | **不引入消息队列中间件**，用 PostgreSQL 表 + 进程内调度 | 任务量与并发度都用不上 BullMQ 级别的基础设施 |
@@ -32,25 +32,24 @@
 
 | 项 | 值 |
 | --- | --- |
-| 实例 | 腾讯云锐驰型轻量云服务器 |
+| 实例 | 腾讯云轻量应用服务器（北京，lhins-medstvam） |
 | CPU | 2 核 |
-| 内存 | 2 GB |
-| 带宽 | 200 Mbps 峰值，不限流量 |
-| 操作系统 | Ubuntu 22.04 / 24.04 LTS（建议） |
+| 内存 | 1 GB（实测 957Mi），另有 1 GB swap（`/www/swap`） |
+| 带宽 | 200 Mbps 峰值，不限流量（以控制台为准） |
+| 操作系统 | OpenCloudOS 9.4 |
+| 管理面板 | 宝塔面板（BT-Panel）已部署，Nginx / PostgreSQL / Node 均由其管理 |
 
-以控制台实际套餐为准。
+实测时间 2026-09-20。注意：**实际内存为 1G 而非早前假设的 2G**，资源预算按 1G 编制。
 
 ### 2.2 内存预算
 
 | 组件 | 预算 | 说明 |
 | --- | --- | --- |
-| OS + Docker | ~300 MB | 含 Docker daemon |
-| PostgreSQL | ~300 MB | 含 `shared_buffers` 256MB 及连接开销 |
-| Node 单进程 | ~300 MB | 堆上限设 512MB，实际常驻低于此 |
-| Nginx | ~30 MB | — |
-| **合计** | **~930 MB / 2048 MB** | **余量 ~1100 MB** |
-
-余量充足，因此队列并发可放宽到 2（1G 机器上必须是 1）。
+| 系统 + 宝塔面板 + 安全组件 | ~450 MB | BT-Panel、云镜 YDService、dockerd、frps 等实测已占用 |
+| PostgreSQL 18（宝塔实例） | ~150 MB | `shared_buffers` 128MB |
+| Node 单进程 | ~250 MB | 堆上限 384MB，实际常驻低于此 |
+| Nginx | ~30 MB | 已随宝塔运行 |
+| **合计** | **~880 MB / 957 MB** | **1 GB swap 兜底，队列并发固定为 1** |
 
 ### 2.3 磁盘预算
 
@@ -69,7 +68,7 @@
 - 只存必要的输入标识（voc_id / scene）与输出摘要
 - 完整内容仅在排障时需要，可设置保留期（如 30 天）后归档或清理
 
-轻量服务器通常自带 40~80 GB SSD，磁盘不构成约束。
+实测磁盘 40 GB（已用 29%），磁盘不构成约束。
 
 ---
 
@@ -83,7 +82,7 @@
        │ HTTPS                    │ HTTPS
        ▼                          ▼
 ┌───────────────────────────────────────────────┐
-│ 独立服务器（腾讯云 2核2G）                       │
+│ 独立服务器（腾讯云北京 2核1G + 1G swap）          │
 │                                               │
 │   Nginx                                        │
 │    ├─ 静态资源（Web 构建产物）+ 长缓存           │
@@ -96,7 +95,7 @@
 │    ├─ Queue Worker  串行写入 + 配额记账 + 频控    │
 │    └─ Scheduler     node-cron 定时任务          │
 │                                               │
-│   PostgreSQL 16（127.0.0.1:5432）               │
+│   PostgreSQL 18（127.0.0.1:5432）               │
 └──────┬──────────────────────┬─────────────────┘
        │                      │
        ▼                      ▼
@@ -141,8 +140,8 @@
 
 ### 4.3 PostgreSQL
 
-- 版本 16
-- 仅监听 `127.0.0.1`，**绝不暴露公网**
+- 版本 18（宝塔既有实例，`/www/server/pgsql`，实测 2026-09-20）
+- 仅监听 `127.0.0.1`，**绝不暴露公网**（实测已满足；轻量防火墙未放行 5432）
 - 同时承担业务数据、队列表、限流辅助计数
 
 ---
@@ -164,9 +163,8 @@ apps/
       utils/request.ts        getClientIp 等工具
     config/postgresql.conf    数据库调参
     deploy/
-      docker-compose.yml      仅 PostgreSQL
-      momohelper-api.service  Node 服务 systemd 单元
-      nginx.conf              站点配置
+      momohelper-api.service  Node 服务 systemd 单元（Node 用宝塔路径）
+      nginx-site.conf         宝塔 Nginx 站点配置片段（合并进宝塔站点）
     .env.example              环境变量样例
 packages/
   api-client/                 前后端共享的接口定义与请求封装
@@ -193,24 +191,23 @@ tsconfig.base.json            共享 TS 配置
 
 | 组件 | 方式 | 说明 |
 | --- | --- | --- |
-| PostgreSQL 16 | Docker Compose | 镜像稳定、数据卷易迁移 |
-| Node 服务 | systemd | 避免 monorepo workspace 依赖的容器化复杂度 |
-| Nginx / certbot | 宿主机 | 常规安装 |
+| PostgreSQL 18 | 宝塔既有实例 | 不再起容器（1G 内存下省资源）；建 `momo` 用户与 `momohelper` 库即可 |
+| Node 服务 | systemd | Node 使用宝塔路径 `/www/server/nodejs/v24.21.0/bin` |
+| Nginx | 宝塔管理 | 站点配置加入宝塔站点，**不得改动既有 80/443 站点** |
 
 配置文件位置：
 
 ```text
 apps/server/.env.example                        环境变量样例
-apps/server/config/postgresql.conf              数据库调参
-apps/server/deploy/docker-compose.yml           仅 PostgreSQL
+apps/server/config/postgresql.conf              数据库调参（应用到宝塔 PG 实例）
 apps/server/deploy/momohelper-api.service       Node 服务单元
-apps/server/deploy/nginx.conf                   站点配置
+apps/server/deploy/nginx-site.conf              宝塔站点配置片段
 ```
 
 三个关键点：
 
-1. **端口绑定 `127.0.0.1`**，不是 `0.0.0.0`。即使安全组配错，数据库与 Node 也无法从公网访问。
-2. **`NODE_OPTIONS=--max-old-space-size=512`**（写在 systemd 单元里），让 Node 自己 GC，而不是被系统 OOM Killer 杀掉。
+1. **端口绑定 `127.0.0.1`**，不是 `0.0.0.0`。数据库实测已满足；Node 也只监听本机，即使安全组配错也无法从公网访问。
+2. **`NODE_OPTIONS=--max-old-space-size=384`**（写在 systemd 单元里），1G 内存下降级，让 Node 自己 GC，而不是被系统 OOM Killer 杀掉。
 3. **`TimeoutStopSec=30`** 配合 SIGTERM，给 Worker 时间写完进行中的任务，避免墨墨侧状态不一致。
 
 Node 不放进容器的原因：monorepo 中 `packages/*` 以 TS 源码形式被 server 引用，容器内需要多阶段构建与 workspace 链接，收益低而复杂度高。systemd 直接运行更简单，也便于用 `journalctl` 查日志。
@@ -219,17 +216,17 @@ Node 不放进容器的原因：monorepo 中 `packages/*` 以 TS 源码形式被
 
 ## 7. PostgreSQL 调参
 
-2 核 2G 内存下的建议值（写入 `config/postgresql.conf`）：
+2 核 1G 内存下的建议值（应用到宝塔 PG 18 实例的配置）：
 
 ```conf
-max_connections = 50
-shared_buffers = 256MB
-effective_cache_size = 768MB
-maintenance_work_mem = 64MB
-work_mem = 8MB
-wal_buffers = 16MB
-min_wal_size = 256MB
-max_wal_size = 1GB
+max_connections = 30
+shared_buffers = 128MB
+effective_cache_size = 384MB
+maintenance_work_mem = 32MB
+work_mem = 4MB
+wal_buffers = 8MB
+min_wal_size = 128MB
+max_wal_size = 512MB
 
 random_page_cost = 1.1
 effective_io_concurrency = 200
@@ -237,9 +234,9 @@ effective_io_concurrency = 200
 
 说明：
 
-- `max_connections = 50`：默认 100 对 2G 内存偏高，每个连接都有固定开销。实际并发连接数远低于此值。
+- `max_connections = 30`：默认 100 对 1G 内存偏高，每个连接都有固定开销。实际并发连接数远低于此值。
 - `random_page_cost = 1.1` 与 `effective_io_concurrency = 200`：针对 SSD 调整，默认值是给机械盘的。
-- 内存调参后**必须加 1~2 GB swap**。swap 不是性能方案，是防 OOM Killer 击杀 PostgreSQL 的兜底。数据库被强杀有损坏数据的风险。
+- 服务器已有 1 GB swap（`/www/swap`）。swap 不是性能方案，是防 OOM Killer 击杀 PostgreSQL 的兜底。数据库被强杀有损坏数据的风险。
 
 ---
 
@@ -247,7 +244,7 @@ effective_io_concurrency = 200
 
 | 项 | 要求 |
 | --- | --- |
-| 安全组 | 只开 443 与 SSH 端口；**5432 绝不开放** |
+| 安全组 | 只开 443 与 SSH（实测端口 223）；**5432 绝不开放**（实测已满足）；建议后续收敛 3389 / 7500 / 8888 等暴露面 |
 | 数据库 | 仅监听 `127.0.0.1`；`scram-sha-256` 认证；强密码 |
 | Node 服务 | 仅监听 `127.0.0.1:3000`，由 Nginx 反代 |
 | 对外端口 | 只有 443（Nginx） |
