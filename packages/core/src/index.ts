@@ -1,7 +1,15 @@
-/**
- * 业务逻辑层。
- *
- * 承载鉴权、配额记账、诊断编排等跨端复用的业务规则。
- * 含 Token 加解密等敏感逻辑，仅允许在服务器运行，前端与小程序不得引入。
- */
-export {}
+export {
+  SESSION_COOKIE,
+  createSessionToken,
+  verifySessionToken
+} from './session.js'
+export type { SessionPayload } from './session.js'
+export {
+  DAILY_QUOTA_LIMIT,
+  QuotaExceededError,
+  getQuotaState,
+  consumeQuota
+} from './quota.js'
+export type { QuotaState } from './quota.js'
+export { boundedEditDistance, findSimilarWords } from './similarity.js'
+export type { SimilarPair } from './similarity.js'

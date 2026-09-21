@@ -1,0 +1,83 @@
+@import 'tailwindcss';
+
+/* 手动切换深色模式（ui-design-spec 2.1） */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 设计 token：编辑排版风，全部取自 docs/ui-design-spec.md 第 2 节 */
+@theme
+{
+  --color-bg: oklch(98.2% 0.004 85);
+  --color-bg-subtle: oklch(96.2% 0.005 85);
+  --color-surface: oklch(99.6% 0.002 85);
+  --color-border: oklch(89% 0.008 80);
+  --color-border-strong: oklch(78% 0.01 80);
+
+  --color-text: oklch(22% 0.012 65);
+  --color-text-muted: oklch(48% 0.01 65);
+  --color-text-subtle: oklch(62% 0.008 65);
+
+  --color-forget: oklch(52% 0.17 28);
+  --color-forget-bg: oklch(95% 0.025 28);
+  --color-vague: oklch(58% 0.13 65);
+  --color-vague-bg: oklch(96% 0.03 75);
+  --color-familiar: oklch(48% 0.09 155);
+  --color-familiar-bg: oklch(95% 0.025 155);
+  --color-info: oklch(48% 0.1 245);
+  --color-info-bg: oklch(95% 0.025 245);
+
+  --color-accent: oklch(52% 0.17 28);
+  --color-accent-hover: oklch(46% 0.18 28);
+  --color-accent-bg: oklch(95% 0.025 28);
+  --color-focus: oklch(58% 0.15 28);
+
+  --font-display: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+  --text-xs: clamp(0.75rem, 0.73rem + 0.1vw, 0.8125rem);
+  --text-sm: clamp(0.8125rem, 0.79rem + 0.15vw, 0.875rem);
+  --text-base: clamp(0.9375rem, 0.91rem + 0.2vw, 1rem);
+  --text-md: clamp(1.0625rem, 1.03rem + 0.25vw, 1.125rem);
+  --text-lg: clamp(1.25rem, 1.19rem + 0.45vw, 1.4375rem);
+  --text-xl: clamp(1.5625rem, 1.45rem + 0.8vw, 1.875rem);
+  --text-3xl: clamp(2.4375rem, 2.1rem + 1.8vw, 3.25rem);
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+}
+
+html
+{
+  background: var(--color-bg);
+}
+
+body
+{
+  font-family: var(--font-body);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: 1.65;
+}
+
+.tabular
+{
+  font-variant-numeric: tabular-nums;
+}
+
+*:focus-visible
+{
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce)
+{
+  *,
+  *::before,
+  *::after
+  {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

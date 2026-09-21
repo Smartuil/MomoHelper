@@ -1,56 +1,126 @@
+import { maimemoCredentials } from '@momo/db'
+import { decryptToken } from '../security/crypto.js'
+import { eq } from 'drizzle-orm'
+import cron from 'node-cron'
+import type { ScheduledTask } from 'node-cron'
+
+import { db } from '../db.js'
+import { getDashboardToday } from '../services/dashboard.js'
+import { MaimemoClient } from '@momo/maimemo'
+
 export interface SchedulerHandle
 {
   stop: () => Promise<void>
 }
 
-/** 定时任务清单（cron 表达式为 6 段，含秒） */
-export const SCHEDULED_TASKS = [
-  {
-    name: 'daily-snapshot',
-    cron: '0 10 0 * * *',
-    description: '每日学习快照，调用 get_study_progress 写入 daily_study_snapshots'
-  },
-  {
-    name: 'queue-resume',
-    cron: '0 30 0 * * *',
-    description: '新的一天配额恢复后，继续执行未完成的写入任务'
-  },
-  {
-    name: 'token-check',
-    cron: '0 0 8 * * *',
-    description: 'Token 过期巡检，标记 EXPIRED 并推送提醒'
-  },
-  {
-    name: 'forget-accumulate',
-    cron: '0 40 23 * * *',
-    description: '汇总当日遗忘事件到 forget_events'
-  },
-  {
-    name: 'weekly-report',
-    cron: '0 0 9 * * 1',
-    description: '生成上周周报'
-  }
-] as const
-
 /**
- * 定时任务调度。
+ * 定时任务（docs/development-guide.md 第 7.7 节）。
  *
  * 这些任务必须无人值守执行：墨墨学习数据接口只有今日快照、没有历史序列，
- * 漏采一天就永久缺失一天，周报与趋势功能全部依赖快照表。
+ * 漏采一天就永久缺失一天，周报与趋势功能全部依赖快照表（C3）。
  *
- * 当前为骨架实现：如需启用，接入 node-cron 后逐个注册 SCHEDULED_TASKS。
+ * 快照任务逐个用户调用墨墨接口，限流由 MaimemoClient 内部排队保证（C9）。
  */
 export function startScheduler(): SchedulerHandle
 {
-  let running = true
+  const tasks: ScheduledTask[] = []
 
-  console.log(`[scheduler] 已注册 ${SCHEDULED_TASKS.length} 项定时任务（骨架，未实际调度）`)
+  // 每日 00:10（北京时间由服务器 TZ=Asia/Shanghai 保证）
+  tasks.push(
+    cron.schedule('0 10 0 * * *', () =>
+    {
+      void runDailySnapshots()
+    })
+  )
+
+  // 每日 08:00 Token 过期巡检（C10：7 天有效期，无刷新机制）
+  tasks.push(
+    cron.schedule('0 0 8 * * *', () =>
+    {
+      void runTokenCheck()
+    })
+  )
+
+  console.log(`[scheduler] 已注册 ${tasks.length} 项定时任务`)
 
   return {
     stop: async () =>
     {
-      running = false
-      void running
+      for (const task of tasks)
+      {
+        task.stop()
+      }
     }
   }
+}
+
+/** 每日快照：对所有 ACTIVE 凭据用户拉取今日进度并落库（FR-15.1） */
+async function runDailySnapshots(): Promise<void>
+{
+  const rows = await db
+    .select()
+    .from(maimemoCredentials)
+    .where(eq(maimemoCredentials.tokenStatus, 'ACTIVE'))
+
+  console.log(`[scheduler] daily-snapshot 开始，共 ${rows.length} 个用户`)
+
+  for (const record of rows)
+  {
+    try
+    {
+      const token = decryptToken(
+        {
+          ciphertext: record.ciphertext,
+          iv: record.iv,
+          authTag: record.authTag,
+          keyVersion: record.keyVersion
+        },
+        record.userId
+      )
+
+      const client = new MaimemoClient({ token })
+      await getDashboardToday(client, record.userId)
+    }
+    catch (error)
+    {
+      // 单个用户失败不阻塞其他用户；鉴权失败标记 EXPIRED（C10）
+      console.error(`[scheduler] 用户 ${record.userId} 快照失败`, error)
+
+      if (error instanceof Error && error.name === 'MaimemoAuthError')
+      {
+        await db
+          .update(maimemoCredentials)
+          .set({ tokenStatus: 'EXPIRED', updatedAt: new Date() })
+          .where(eq(maimemoCredentials.userId, record.userId))
+      }
+    }
+  }
+
+  console.log('[scheduler] daily-snapshot 结束')
+}
+
+/** Token 过期巡检：过期时间已到的标记 EXPIRED，前端引导重绑 */
+async function runTokenCheck(): Promise<void>
+{
+  const rows = await db
+    .select()
+    .from(maimemoCredentials)
+    .where(eq(maimemoCredentials.tokenStatus, 'ACTIVE'))
+
+  const now = Date.now()
+  let expired = 0
+
+  for (const record of rows)
+  {
+    if (record.tokenExpiresAt && record.tokenExpiresAt.getTime() < now)
+    {
+      await db
+        .update(maimemoCredentials)
+        .set({ tokenStatus: 'EXPIRED', updatedAt: new Date() })
+        .where(eq(maimemoCredentials.userId, record.userId))
+      expired++
+    }
+  }
+
+  console.log(`[scheduler] token-check 完成，标记过期 ${expired} 个`)
 }
