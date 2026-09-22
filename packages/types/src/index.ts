@@ -242,3 +242,20 @@ export interface StudyProgressDto
   dataReliable: boolean
   capturedAt: string
 }
+
+/** 学习趋势单日数据点（来自每日快照，GET /api/dashboard/history） */
+export interface DashboardTrendPointDto
+{
+  /** 北京时区日期，YYYY-MM-DD */
+  date: string
+  finished: number
+  total: number
+  studyTimeMs: number
+  isReliable: boolean
+}
+
+/** 学习趋势序列（GET /api/dashboard/history） */
+export interface DashboardHistoryDto
+{
+  days: DashboardTrendPointDto[]
+}

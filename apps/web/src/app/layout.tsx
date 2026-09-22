@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 import './globals.css'
 import { Providers } from './providers'
-import { SideNav } from '@/components/side-nav'
+import { MobileNav, SideNav } from '@/components/side-nav'
 
 export const metadata: Metadata = {
   title: '墨墨 AI 学习副驾',
@@ -28,11 +28,14 @@ export default function RootLayout({ children }: { children: React.ReactNode })
       </head>
       <body className="min-h-screen">
         <Providers>
-          <div className="flex">
+          <div className="flex min-h-screen">
             <SideNav />
-            <main className="min-w-0 flex-1 px-6 py-10 md:px-12 lg:px-16">
-              <div className="mx-auto max-w-[1200px]">{children}</div>
-            </main>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <MobileNav />
+              <main className="min-w-0 flex-1 px-5 py-8 md:px-10 md:py-10">
+                <div className="mx-auto w-full max-w-[1240px]">{children}</div>
+              </main>
+            </div>
           </div>
         </Providers>
       </body>

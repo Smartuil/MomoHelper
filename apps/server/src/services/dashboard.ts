@@ -1,9 +1,13 @@
-import type { DashboardTodayDto, FocusWordDto } from '@momo/types'
-import { beijingToday } from '@momo/maimemo'
+import type {
+  DashboardHistoryDto,
+  DashboardTodayDto,
+  FocusWordDto
+} from '@momo/types'
+import { beijingToday, toBeijingDate } from '@momo/maimemo'
 import { getStudyProgress, getTodayItems } from '@momo/maimemo'
 import type { MaimemoClient } from '@momo/maimemo'
 import { dailyStudySnapshots, forgetEvents } from '@momo/db'
-import { desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, gte } from 'drizzle-orm'
 
 import { db } from '../db.js'
 
@@ -151,6 +155,36 @@ export async function getLatestSnapshot(userId: string): Promise<DashboardTodayD
     forgottenWords: 0,
     dataReliable: false,
     capturedAt: snapshot.capturedAt.toISOString()
+  }
+}
+
+/** 学习趋势：近 N 天快照序列（FR-15.1 快照是趋势的唯一数据源，C3） */
+export async function getDashboardHistory(
+  userId: string,
+  days: number
+): Promise<DashboardHistoryDto>
+{
+  const startDate = toBeijingDate(new Date(Date.now() - (days - 1) * 86_400_000))
+
+  const rows = await db
+    .select()
+    .from(dailyStudySnapshots)
+    .where(
+      and(
+        eq(dailyStudySnapshots.userId, userId),
+        gte(dailyStudySnapshots.snapshotDate, startDate)
+      )
+    )
+    .orderBy(asc(dailyStudySnapshots.snapshotDate))
+
+  return {
+    days: rows.map((row) => ({
+      date: row.snapshotDate,
+      finished: row.finished,
+      total: row.total,
+      studyTimeMs: row.studyTimeMs,
+      isReliable: row.isReliable
+    }))
   }
 }
 

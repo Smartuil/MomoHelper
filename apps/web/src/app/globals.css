@@ -3,19 +3,24 @@
 /* 手动切换深色模式（ui-design-spec 2.1） */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 设计 token：编辑排版风，全部取自 docs/ui-design-spec.md 第 2 节 */
+/*
+ * 设计 token：暖纸底 × Bento 瓷贴（个人中心看板方向）
+ * 语义色沿用 docs/ui-design-spec.md 第 2 节；几何与阴影为看板化升级。
+ */
 @theme
 {
-  --color-bg: oklch(98.2% 0.004 85);
-  --color-bg-subtle: oklch(96.2% 0.005 85);
-  --color-surface: oklch(99.6% 0.002 85);
-  --color-border: oklch(89% 0.008 80);
-  --color-border-strong: oklch(78% 0.01 80);
+  /* 画布：暖纸，比卡片深一档，让瓷贴浮起 */
+  --color-bg: oklch(96.8% 0.008 85);
+  --color-bg-subtle: oklch(94.6% 0.01 85);
+  --color-surface: oklch(99.4% 0.003 85);
+  --color-border: oklch(90% 0.01 80);
+  --color-border-strong: oklch(80% 0.014 80);
 
-  --color-text: oklch(22% 0.012 65);
-  --color-text-muted: oklch(48% 0.01 65);
-  --color-text-subtle: oklch(62% 0.008 65);
+  --color-text: oklch(23% 0.014 65);
+  --color-text-muted: oklch(46% 0.012 65);
+  --color-text-subtle: oklch(60% 0.01 65);
 
+  /* 语义色（响应四色，保留产品语义） */
   --color-forget: oklch(52% 0.17 28);
   --color-forget-bg: oklch(95% 0.025 28);
   --color-vague: oklch(58% 0.13 65);
@@ -30,6 +35,11 @@
   --color-accent-bg: oklch(95% 0.025 28);
   --color-focus: oklch(58% 0.15 28);
 
+  /* 阴影：柔和弥散，两层 */
+  --shadow-tile: 0 1px 2px oklch(23% 0.014 65 / 0.04), 0 6px 20px oklch(23% 0.014 65 / 0.05);
+  --shadow-tile-hover: 0 2px 4px oklch(23% 0.014 65 / 0.05), 0 14px 36px oklch(23% 0.014 65 / 0.1);
+  --shadow-pop: 0 4px 12px oklch(23% 0.014 65 / 0.08), 0 20px 48px oklch(23% 0.014 65 / 0.12);
+
   --font-display: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
   --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
@@ -42,9 +52,13 @@
   --text-xl: clamp(1.5625rem, 1.45rem + 0.8vw, 1.875rem);
   --text-3xl: clamp(2.4375rem, 2.1rem + 1.8vw, 3.25rem);
 
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
+  /* Bento 几何：圆角放大 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html
@@ -69,6 +83,81 @@ body
 {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* ============ Bento 瓷贴（放 components 层，允许工具类覆盖） ============ */
+
+@keyframes tile-in
+{
+  from
+  {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to
+  {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ring-draw
+{
+  from
+  {
+    stroke-dashoffset: var(--ring-circ, 100);
+  }
+}
+
+@keyframes num-in
+{
+  from
+  {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@layer components
+{
+  /* 瓷贴基座：白卡 + 细边 + 柔影，hover 轻抬 */
+  .tile
+  {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-tile);
+    transition:
+      transform 0.25s var(--ease-out-soft),
+      box-shadow 0.25s var(--ease-out-soft),
+      border-color 0.25s var(--ease-out-soft);
+  }
+
+  .tile-hover:hover
+  {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-tile-hover);
+    border-color: var(--color-border-strong);
+  }
+
+  /* 入场：错峰上浮（--i 为序号） */
+  .tile-in
+  {
+    animation: tile-in 0.55s var(--ease-out-soft) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  /* 进度环描边 */
+  .ring-progress
+  {
+    animation: ring-draw 0.9s var(--ease-out-soft) 0.15s both;
+  }
+
+  /* 数字滚动过渡（值变化时由 React 换 key 触发） */
+  .num-in
+  {
+    animation: num-in 0.35s var(--ease-out-soft) both;
+  }
 }
 
 @media (prefers-reduced-motion: reduce)

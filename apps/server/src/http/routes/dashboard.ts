@@ -1,10 +1,11 @@
 import type { FocusWordDto } from '@momo/types'
 import { queryStudyRecords } from '@momo/maimemo'
 import { Hono } from 'hono'
+import { z } from 'zod'
 
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
-import { getDashboardToday, getTodayForgotten } from '../../services/dashboard.js'
+import { getDashboardHistory, getDashboardToday, getTodayForgotten } from '../../services/dashboard.js'
 import { getMaimemoClient, isAuthError } from '../../services/maimemo-client.js'
 
 /**
@@ -20,6 +21,17 @@ dashboardRoutes.get('/dashboard/today', async (c) =>
   const client = await getMaimemoClient(userId)
 
   const dto = await getDashboardToday(client, userId)
+  return c.json({ data: dto })
+})
+
+/** 学习趋势（近 N 天快照序列；纯本地数据，不调墨墨） */
+dashboardRoutes.get('/dashboard/history', async (c) =>
+{
+  const days = z.coerce.number().int().min(7).max(60).default(14).parse(
+    c.req.query('days') ?? undefined
+  )
+
+  const dto = await getDashboardHistory(c.get('userId'), days)
   return c.json({ data: dto })
 })
 

@@ -5,6 +5,8 @@ import { useState } from 'react'
 
 import { apiFetch, ApiError } from '@/lib/api'
 import type { ConfusionResult } from '@momo/ai'
+import { Icon } from '@/components/icons'
+import { EmptyTile, ErrorNote, PageHeader, Tile, TileSkeleton } from '@/components/kit'
 
 interface CandidatesResponse
 {
@@ -21,7 +23,8 @@ export default function ConfusionPage()
 
   const candidates = useQuery({
     queryKey: ['confusion', 'candidates'],
-    queryFn: () => apiFetch<CandidatesResponse>('/api/confusion/candidates')
+    queryFn: () => apiFetch<CandidatesResponse>('/api/confusion/candidates'),
+    staleTime: 5 * 60_000
   })
 
   const analyze = useMutation({
@@ -35,64 +38,71 @@ export default function ConfusionPage()
 
   function togglePair(a: string, b: string): void
   {
-    const words = [a, b]
-
-    setSelected(words)
+    setSelected([a, b])
     setResult(null)
   }
 
   return (
     <div>
-      <h1 className="border-b border-[var(--color-border)] pb-6 font-[family-name:var(--font-display)] text-[var(--text-xl)]">
-        易混词诊断
-      </h1>
+      <PageHeader
+        title="易混词诊断"
+        description={
+          candidates.data
+            ? `基于你的 ${candidates.data.scannedWordCount} 个已知词计算（编辑距离 ≤ 1），选择一组进行 AI 对比分析`
+            : '从已知词中发现只差一个字母的形近词'
+        }
+      />
 
       {candidates.isPending && (
-        <p className="mt-10 text-[var(--text-sm)] text-[var(--color-text-subtle)]">计算形近词中…</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <TileSkeleton key={i} />
+          ))}
+        </div>
       )}
 
-      {candidates.isError && (
-        <p role="alert" className="mt-10 text-[var(--text-sm)] text-[var(--color-forget)]">
-          {(candidates.error as ApiError).message}
-        </p>
+      {candidates.isError && <ErrorNote message={(candidates.error as ApiError).message} />}
+
+      {candidates.data && candidates.data.pairs.length === 0 && (
+        <EmptyTile
+          title="暂未发现形近词"
+          description="学习词量增加后，这里会自动发现只差一个字母的词。"
+        />
       )}
 
-      {candidates.data && (
-        <>
-          <p className="mt-4 text-[var(--text-sm)] text-[var(--color-text-subtle)]">
-            基于你的 {candidates.data.scannedWordCount} 个已知词计算（编辑距离 ≤ 1），选择一组进行 AI 对比分析。
-          </p>
+      {candidates.data && candidates.data.pairs.length > 0 && (
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {candidates.data.pairs.map((pair, i) =>
+          {
+            const active = selected[0] === pair.a && selected[1] === pair.b
 
-          {candidates.data.pairs.length === 0 ? (
-            <p className="mt-16 text-center text-[var(--text-sm)] text-[var(--color-text-muted)]">
-              暂未发现形近词。学习词量增加后，这里会自动发现只差一个字母的词。
-            </p>
-          ) : (
-            <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {candidates.data.pairs.map((pair) => (
-                <li key={`${pair.a}-${pair.b}`}>
-                  <button
-                    type="button"
-                    onClick={() => togglePair(pair.a, pair.b)}
-                    className="w-full border border-[var(--color-border)] px-4 py-3 text-left hover:border-[var(--color-border-strong)]"
-                  >
-                    <span className="font-[family-name:var(--font-display)] text-[var(--text-md)]">
-                      {pair.a} / {pair.b}
-                    </span>
-                    <span className="ml-2 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
-                      编辑距离 {pair.distance}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+            return (
+              <li key={`${pair.a}-${pair.b}`}>
+                <button
+                  type="button"
+                  onClick={() => togglePair(pair.a, pair.b)}
+                  aria-pressed={active}
+                  style={{ '--i': i } as React.CSSProperties}
+                  className={`tile tile-in tile-hover w-full px-4 py-3.5 text-left ${
+                    active ? 'border-[var(--color-accent)] bg-[var(--color-accent-bg)]' : ''
+                  }`}
+                >
+                  <span className="font-[family-name:var(--font-display)] text-[var(--text-md)]">
+                    {pair.a} / {pair.b}
+                  </span>
+                  <span className="ml-2 rounded-full bg-[var(--color-bg-subtle)] px-2 py-0.5 font-[family-name:var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+                    距离 {pair.distance}
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       )}
 
       {selected.length >= 2 && (
-        <section className="mt-12 border-t border-[var(--color-border)] pt-8">
-          <div className="flex items-baseline justify-between">
+        <Tile hover={false} index={10} className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-[family-name:var(--font-display)] text-[var(--text-lg)]">
               {selected.join(' / ')}
             </h2>
@@ -100,16 +110,17 @@ export default function ConfusionPage()
               type="button"
               onClick={() => analyze.mutate(selected)}
               disabled={analyze.isPending}
-              className="h-9 bg-[var(--color-accent)] px-5 text-[var(--text-sm)] text-white disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-[var(--color-accent)] px-5 text-[var(--text-sm)] font-medium text-white transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
             >
+              <Icon name="zap" className={`h-4 w-4 ${analyze.isPending ? 'animate-pulse' : ''}`} />
               {analyze.isPending ? '分析中…' : 'AI 对比分析'}
             </button>
           </div>
 
           {analyze.isError && (
-            <p role="alert" className="mt-4 text-[var(--text-sm)] text-[var(--color-forget)]">
-              {(analyze.error as ApiError).message}
-            </p>
+            <div className="mt-4">
+              <ErrorNote message={(analyze.error as ApiError).message} />
+            </div>
           )}
 
           {result && (
@@ -120,23 +131,26 @@ export default function ConfusionPage()
                 </p>
               )}
 
-              <dl className="mt-4 divide-y divide-[var(--color-border)]">
+              <dl className="mt-3 grid gap-4 md:grid-cols-2">
                 {result.pairs.map((pair) => (
-                  <div key={pair.word} className="grid gap-2 py-4 sm:grid-cols-[10rem_1fr]">
+                  <div
+                    key={pair.word}
+                    className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg-subtle)] px-4 py-3.5"
+                  >
                     <dt>
                       <p className="font-[family-name:var(--font-display)] text-[var(--text-md)]">
                         {pair.word}
                       </p>
-                      <p className="text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+                      <p className="font-[family-name:var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-subtle)]">
                         {pair.pos}
                       </p>
                     </dt>
-                    <dd>
+                    <dd className="mt-2">
                       <p className="text-[var(--text-sm)]">{pair.meaning}</p>
-                      <p className="mt-1 text-[var(--text-sm)] italic text-[var(--color-text-muted)]">
+                      <p className="mt-1.5 text-[var(--text-sm)] italic text-[var(--color-text-muted)]">
                         {pair.example}
                       </p>
-                      <p className="mt-1 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+                      <p className="mt-1.5 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
                         {pair.distinct}
                       </p>
                     </dd>
@@ -144,13 +158,13 @@ export default function ConfusionPage()
                 ))}
               </dl>
 
-              <div className="border-l-2 border-[var(--color-accent)] bg-[var(--color-accent-bg)] px-4 py-3">
+              <div className="mt-4 rounded-md border-l-4 border-[var(--color-accent)] bg-[var(--color-accent-bg)] px-4 py-3">
                 <p className="text-[var(--text-xs)] font-semibold">别再混</p>
                 <p className="mt-1 text-[var(--text-sm)]">{result.memo}</p>
               </div>
             </div>
           )}
-        </section>
+        </Tile>
       )}
     </div>
   )
