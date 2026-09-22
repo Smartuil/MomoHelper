@@ -101,6 +101,7 @@ export async function getDashboardToday(
     // 仅学习数据不可用走降级；Token 失效等错误继续向上抛
     if (error instanceof Error && error.name === 'MaimemoStudyUnavailableError')
     {
+      console.warn('[dashboard] 学习数据拉取失败，降级为最近快照:', error.message)
       return getLatestSnapshot(userId)
     }
 

@@ -26,7 +26,7 @@ const progressSchema = z.object({
 })
 
 const todayItemsSchema = z.object({
-  items: z.array(z.any())
+  today_items: z.array(z.any()).optional()
 })
 
 const recordsSchema = z.object({
@@ -54,9 +54,12 @@ export async function getTodayItems(client: MaimemoClient): Promise<MaimemoStudy
 {
   try
   {
-    const data = await client.request<unknown>('POST', '/study/get_today_items', {})
+    // limit 显式拉满：接口默认仅返回 50 条，看板统计需要全量今日词表
+    const data = await client.request<unknown>('POST', '/study/get_today_items', {
+      limit: 1000
+    })
     const parsed = todayItemsSchema.parse(data)
-    return (parsed.items ?? []) as MaimemoStudyTodayItem[]
+    return (parsed.today_items ?? []) as MaimemoStudyTodayItem[]
   }
   catch (error)
   {
@@ -71,7 +74,6 @@ export interface QueryStudyRecordsParams
   nextStudyDateStart?: string
   nextStudyDateEnd?: string
   limit?: number
-  offset?: number
 }
 
 export interface QueryStudyRecordsResult
@@ -88,12 +90,17 @@ export async function queryStudyRecords(
 {
   try
   {
+    // next_study_date 为嵌套对象（.start / .end），非扁平字段
     const data = await client.request<unknown>('POST', '/study/query_study_records', {
       as_count: params.asCount,
-      next_study_date_start: params.nextStudyDateStart,
-      next_study_date_end: params.nextStudyDateEnd,
-      limit: params.limit,
-      offset: params.offset
+      next_study_date:
+        params.nextStudyDateStart || params.nextStudyDateEnd
+          ? {
+              ...(params.nextStudyDateStart ? { start: params.nextStudyDateStart } : {}),
+              ...(params.nextStudyDateEnd ? { end: params.nextStudyDateEnd } : {})
+            }
+          : undefined,
+      limit: params.limit
     })
 
     const parsed = recordsSchema.parse(data)

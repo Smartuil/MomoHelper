@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 
+import { env } from '../config/env.js'
 import { errorHandler } from './middleware/error.js'
 import { authRoutes } from './routes/auth.js'
 import { askRoutes } from './routes/ask.js'
@@ -20,6 +22,20 @@ export function createApp(): Hono
   const app = new Hono()
 
   app.onError(errorHandler)
+
+  // 本地开发：web(3100) 跨端口访问 API(3000)；生产同域部署无需 CORS
+  if (env.NODE_ENV === 'development')
+  {
+    app.use(
+      '/api/*',
+      cors({
+        origin: ['http://localhost:3100', 'http://127.0.0.1:3100'],
+        allowHeaders: ['Content-Type'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        credentials: true
+      })
+    )
+  }
 
   const api = new Hono()
 
