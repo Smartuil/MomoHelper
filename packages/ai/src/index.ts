@@ -11,11 +11,36 @@ export {
   forgetReasonSchema,
   analyzeConfusion,
   diagnoseForget,
-  buildAskMessages
+  buildAskMessages,
+  SCENE_HINTS,
+  NOTE_TYPES,
+  interpretationSchema,
+  phraseSchema,
+  noteSchema,
+  generateInterpretation,
+  generatePhrase,
+  generateNote,
+  planAdviceSchema,
+  dailyReviewSchema,
+  reportSchema,
+  extractWordsSchema,
+  generatePlanAdvice,
+  generateDailyReview,
+  generateReport,
+  extractWords
 } from './tasks.js'
 export type {
   ConfusionResult,
   ForgetDiagnosis,
   ForgetDiagnosisInput,
-  AskContext
+  AskContext,
+  GenerateInput,
+  GenerationOutput,
+  InterpretationResult,
+  PhraseResult,
+  NoteResult,
+  PlanAdviceResult,
+  DailyReviewResult,
+  ReportResult,
+  ExtractWordsResult
 } from './tasks.js'

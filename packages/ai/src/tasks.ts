@@ -174,3 +174,306 @@ export function buildAskMessages(question: string, context?: AskContext)
     { role: 'user' as const, content: userContent }
   ]
 }
+
+/* ============================= 内容生成（FR-6 / 7 / 8） ============================= */
+
+/** 生成场景说明（FR-6.3 的六种语气），拼接进可变参数段 */
+export const SCENE_HINTS: Record<string, string> = {
+  CONCISE: '简洁实用：最小可用释义/例句，口语友好',
+  EXAM: '考试向：贴合四六级/考研常见考法',
+  WORK: '职场商务：正式书面语，覆盖商务搭配',
+  TECH: '科技互联网：覆盖技术语境常用义',
+  PAPER: '学术论文：学术语域，术语化表达',
+  CONTRAST: '易混对比：强调与形近/近义词的区分点'
+}
+
+/** 助记类型固定枚举（AC-8.1，避免自由枚举污染墨墨数据） */
+export const NOTE_TYPES = ['ROOT', 'ASSOCIATION', 'STORY', 'CONTRAST'] as const
+
+export const interpretationSchema = z.object({
+  content: z.string().min(1).max(500)
+})
+
+export type InterpretationResult = z.infer<typeof interpretationSchema>
+
+const INTERPRETATION_SYSTEM_PROMPT = `你是英语词汇内容编辑。为给定单词生成一条自定义释义，输出 json。
+json 格式：{ "content": "中文释义（可含词性标注，如 n. 洗涤剂）" }
+要求：1. 准确、简洁，符合给定场景的语域；2. 只输出 json。`
+
+export interface GenerateInput
+{
+  spelling: string
+  scene: string
+  studyCount?: number
+  isSticking?: boolean
+}
+
+export interface GenerationOutput<T>
+{
+  data: T
+  promptTokens: number
+  completionTokens: number
+}
+
+export async function generateInterpretation(
+  client: AiClient,
+  input: GenerateInput
+): Promise<GenerationOutput<InterpretationResult>>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: INTERPRETATION_SYSTEM_PROMPT },
+      { role: 'user', content: buildContentUserPrompt(input) }
+    ],
+    jsonMode: true,
+    maxTokens: 300,
+    temperature: 0.4
+  })
+
+  return {
+    data: interpretationSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
+}
+
+export const phraseSchema = z.object({
+  content: z.string().min(1).max(300),
+  highlightStart: z.number().int().min(0),
+  highlightEnd: z.number().int().min(1)
+})
+
+export type PhraseResult = z.infer<typeof phraseSchema>
+
+const PHRASE_SYSTEM_PROMPT = `你是英语词汇内容编辑。为给定单词生成一条地道英文例句，输出 json。
+json 格式：{ "content": "英文例句（必须包含该单词）", "highlightStart": 0, "highlightEnd": 5 }
+highlight 区间标注单词在例句中的字符位置，end 为开区间（不含 end）。只输出 json。
+注意：即使给出高亮区间，调用方也会按实际出现位置重新计算，请确保例句完整包含该单词。`
+
+export async function generatePhrase(
+  client: AiClient,
+  input: GenerateInput
+): Promise<GenerationOutput<PhraseResult>>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: PHRASE_SYSTEM_PROMPT },
+      { role: 'user', content: buildContentUserPrompt(input) }
+    ],
+    jsonMode: true,
+    maxTokens: 300,
+    temperature: 0.6
+  })
+
+  return {
+    data: phraseSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
+}
+
+export const noteSchema = z.object({
+  content: z.string().min(1).max(500),
+  noteType: z.enum(['ROOT', 'ASSOCIATION', 'STORY', 'CONTRAST'])
+})
+
+export type NoteResult = z.infer<typeof noteSchema>
+
+const NOTE_SYSTEM_PROMPT = `你是英语词汇记忆专家。为给定单词生成一条助记内容，输出 json。
+json 格式：{ "content": "中文助记（词根拆解 / 联想 / 小故事 / 对比记忆）", "noteType": "ROOT|ASSOCIATION|STORY|CONTRAST" }
+noteType 必须从四个枚举中选择，与助记方式对应。只输出 json。`
+
+export async function generateNote(
+  client: AiClient,
+  input: GenerateInput
+): Promise<GenerationOutput<NoteResult>>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: NOTE_SYSTEM_PROMPT },
+      { role: 'user', content: buildContentUserPrompt(input) }
+    ],
+    jsonMode: true,
+    maxTokens: 500,
+    temperature: 0.6
+  })
+
+  return {
+    data: noteSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
+}
+
+/** 可变参数段：单词 + 场景 + 真实学习数据（固定部分已前置命中缓存，V4） */
+function buildContentUserPrompt(input: GenerateInput): string
+{
+  const sceneHint = SCENE_HINTS[input.scene] ?? SCENE_HINTS['CONCISE']
+  const lines = [
+    `单词：${input.spelling}`,
+    `场景：${input.scene}（${sceneHint}）`
+  ]
+
+  if (typeof input.studyCount === 'number')
+  {
+    lines.push(`学习次数：${input.studyCount}（真实数据，学过多次的词助记要更有区分度）`)
+  }
+
+  if (input.isSticking)
+  {
+    lines.push('该词为官方顽固词（STICKING）')
+  }
+
+  return lines.join('\n')
+}
+
+/* ============================= 学习计划建议（FR-11.5） ============================= */
+
+export const planAdviceSchema = z.object({
+  advice: z.string().min(1).max(800)
+})
+
+export type PlanAdviceResult = z.infer<typeof planAdviceSchema>
+
+const PLAN_ADVICE_SYSTEM_PROMPT = `你是词汇学习规划师。根据用户的真实学习数据给出学习计划建议，输出 json。
+json 格式：{ "advice": "中文建议（100 字内，给具体可执行的动作，引用数据时不编造）" }
+只输出 json。`
+
+export interface PlanAdviceInput
+{
+  totalWords: number
+  pressure: { date: string; count: number }[]
+  recentFinished: { date: string; finished: number }[]
+}
+
+export async function generatePlanAdvice(
+  client: AiClient,
+  input: PlanAdviceInput
+): Promise<PlanAdviceResult>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: PLAN_ADVICE_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `计划总词数：${input.totalWords}\n未来复习压力：${input.pressure
+          .map((p) => `${p.date}:${p.count}`)
+          .join('，')}\n近期完成：${input.recentFinished
+          .map((p) => `${p.date}:${p.finished}`)
+          .join('，')}`
+      }
+    ],
+    jsonMode: true,
+    maxTokens: 400,
+    temperature: 0.5
+  })
+
+  return planAdviceSchema.parse(JSON.parse(result.content))
+}
+
+/* ============================= 每日复盘（FR-12） ============================= */
+
+export const dailyReviewSchema = z.object({
+  summary: z.string().min(1).max(300),
+  highlights: z.array(z.string().min(1)).max(5),
+  problems: z.array(z.string().min(1)).max(5),
+  suggestions: z.array(z.string().min(1)).max(5)
+})
+
+export type DailyReviewResult = z.infer<typeof dailyReviewSchema>
+
+const DAILY_REVIEW_SYSTEM_PROMPT = `你是词汇学习复盘助手。根据用户当日的真实学习数据生成复盘，输出 json。
+json 格式：
+{ "summary": "一句话总结", "highlights": ["做得好的点"], "problems": ["暴露的问题"], "suggestions": ["明日改进建议"] }
+要求：1. 只基于给出的数据，不编造；2. 每条一句话，具体不空洞。只输出 json。`
+
+export async function generateDailyReview(
+  client: AiClient,
+  metrics: Record<string, unknown>
+): Promise<DailyReviewResult>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: DAILY_REVIEW_SYSTEM_PROMPT },
+      { role: 'user', content: JSON.stringify(metrics) }
+    ],
+    jsonMode: true,
+    maxTokens: 700,
+    temperature: 0.5
+  })
+
+  return dailyReviewSchema.parse(JSON.parse(result.content))
+}
+
+/* ============================= 周报 / 月报（FR-13） ============================= */
+
+export const reportSchema = z.object({
+  summary: z.string().min(1).max(400),
+  highlights: z.array(z.string().min(1)).max(5),
+  focus: z.array(z.string().min(1)).max(5)
+})
+
+export type ReportResult = z.infer<typeof reportSchema>
+
+const REPORT_SYSTEM_PROMPT = `你是词汇学习分析助手。根据一段周期内的真实学习数据生成报告，输出 json。
+json 格式：{ "summary": "周期总结（引用数据）", "highlights": ["亮点"], "focus": ["下周期关注点"] }
+要求：只基于给出的数据；数据不完整时措辞保守。只输出 json。`
+
+export async function generateReport(
+  client: AiClient,
+  metrics: Record<string, unknown>
+): Promise<ReportResult>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: REPORT_SYSTEM_PROMPT },
+      { role: 'user', content: JSON.stringify(metrics) }
+    ],
+    jsonMode: true,
+    maxTokens: 700,
+    temperature: 0.5
+  })
+
+  return reportSchema.parse(JSON.parse(result.content))
+}
+
+/* ============================= 文本生词提取（FR-10） ============================= */
+
+export const extractWordsSchema = z.object({
+  words: z.array(z.string().min(1).max(64)).max(150)
+})
+
+export type ExtractWordsResult = z.infer<typeof extractWordsSchema>
+
+const EXTRACT_SYSTEM_PROMPT = `你是英语教学助手。从用户提供的文本中提取值得学习的英语单词或短语，输出 json。
+json 格式：{ "words": ["candidate", "words"] }
+要求：
+1. 排除 the/is/and 等极基础功能词与专有名词；
+2. 优先提取低频词、学术词、多义熟词僻义与地道短语；
+3. 最多 100 个，按学习价值从高到低排列；
+4. 输出原形（小写）。只输出 json。`
+
+export async function extractWords(
+  client: AiClient,
+  text: string
+): Promise<ExtractWordsResult>
+{
+  const result = await client.complete({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: EXTRACT_SYSTEM_PROMPT },
+      { role: 'user', content: text.slice(0, 4000) }
+    ],
+    jsonMode: true,
+    maxTokens: 900,
+    temperature: 0.3
+  })
+
+  return extractWordsSchema.parse(JSON.parse(result.content))
+}

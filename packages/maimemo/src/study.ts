@@ -118,7 +118,11 @@ export async function queryStudyRecords(
 
 export interface AddWordsParams
 {
-  spellings: string[]
+  /**
+   * 墨墨词 ID 列表（voc_id）。官方接口要求 words[{id}] 结构而非拼写，
+   * 拼写 → voc_id 的解析由调用方经 queryVocabulary 完成。
+   */
+  words: { id: string }[]
   /** 加入计划并立即复习（不受 C5 等级限制），FR-11.8 */
   advance?: boolean
 }
@@ -133,28 +137,30 @@ export async function addWords(
     'POST',
     '/study/add_words',
     {
-      spellings: params.spellings,
+      words: params.words,
       advance: params.advance
     },
     // 写操作不重试（NFR-3.2）
     { retries: 0 }
   )
 
-  return data.added_count ?? params.spellings.length
+  return data.added_count ?? params.words.length
 }
 
 /**
  * 将单词提前到当下复习（C5：需账号等级 ≥ 10，无预检接口，只能失败后处理）。
- * 调用方需把 MaimemoApiError 转译为「等级不足」提示并推荐 addWords advance。
+ * 官方接口要求 voc_ids；调用方需把 MaimemoApiError 转译为「等级不足」提示并推荐 addWords advance。
  */
-export async function advanceStudy(client: MaimemoClient, spellings: string[]): Promise<void>
+export async function advanceStudy(client: MaimemoClient, vocIds: string[]): Promise<number>
 {
-  await client.request(
+  const data = await client.request<{ advanced_count?: number }>(
     'POST',
     '/study/advance_study',
-    { spellings },
+    { voc_ids: vocIds },
     { retries: 0 }
   )
+
+  return data.advanced_count ?? vocIds.length
 }
 
 /** 公测接口的一切失败统一转译为不可用错误（C2 降级入口） */

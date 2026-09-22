@@ -6,6 +6,8 @@ import type { ScheduledTask } from 'node-cron'
 
 import { db } from '../db.js'
 import { getDashboardToday } from '../services/dashboard.js'
+import { resumePausedJobs } from '../worker/index.js'
+import { generateWeeklyReports } from '../http/routes/review.js'
 import { MaimemoClient } from '@momo/maimemo'
 
 export interface SchedulerHandle
@@ -33,6 +35,30 @@ export function startScheduler(): SchedulerHandle
     })
   )
 
+  // 每日 23:40 遗忘事件累积（FR-15.5）：当日收尾再采一次，落 forget_events
+  tasks.push(
+    cron.schedule('0 40 23 * * *', () =>
+    {
+      void runDailySnapshots('forget-accumulate')
+    })
+  )
+
+  // 每日 00:30 配额恢复：PAUSED 任务回到 PENDING（7.7 queue-resume）
+  tasks.push(
+    cron.schedule('0 30 0 * * *', () =>
+    {
+      void resumePausedJobs()
+    })
+  )
+
+  // 每周一 09:00 生成上周周报（7.7 weekly-report）
+  tasks.push(
+    cron.schedule('0 0 9 * * 1', () =>
+    {
+      void generateWeeklyReports()
+    })
+  )
+
   // 每日 08:00 Token 过期巡检（C10：7 天有效期，无刷新机制）
   tasks.push(
     cron.schedule('0 0 8 * * *', () =>
@@ -54,15 +80,15 @@ export function startScheduler(): SchedulerHandle
   }
 }
 
-/** 每日快照：对所有 ACTIVE 凭据用户拉取今日进度并落库（FR-15.1） */
-async function runDailySnapshots(): Promise<void>
+/** 每日快照：对所有 ACTIVE 凭据用户拉取今日进度并落库（FR-15.1 / FR-15.5） */
+async function runDailySnapshots(taskName = 'daily-snapshot'): Promise<void>
 {
   const rows = await db
     .select()
     .from(maimemoCredentials)
     .where(eq(maimemoCredentials.tokenStatus, 'ACTIVE'))
 
-  console.log(`[scheduler] daily-snapshot 开始，共 ${rows.length} 个用户`)
+  console.log(`[scheduler] ${taskName} 开始，共 ${rows.length} 个用户`)
 
   for (const record of rows)
   {
@@ -96,7 +122,7 @@ async function runDailySnapshots(): Promise<void>
     }
   }
 
-  console.log('[scheduler] daily-snapshot 结束')
+  console.log(`[scheduler] ${taskName} 结束`)
 }
 
 /** Token 过期巡检：过期时间已到的标记 EXPIRED，前端引导重绑 */

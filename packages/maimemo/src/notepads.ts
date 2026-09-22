@@ -11,10 +11,11 @@ import type { MaimemoClient } from './client.js'
  * C8：不支持删除单个单词，删除词只能 GET 全量 → 修改 → 整体覆盖。
  */
 
+// 实测：notepads 列表接口的条目不含 content（只有详情返回），必须容错
 const notepadSchema = z.object({
   id: z.string(),
   title: z.string(),
-  content: z.string(),
+  content: z.string().optional().default(''),
   tags: z.array(z.string()).optional()
 })
 
@@ -33,7 +34,14 @@ export async function listNotepads(client: MaimemoClient): Promise<MaimemoNotepa
 export async function getNotepad(client: MaimemoClient, id: string): Promise<MaimemoNotepad>
 {
   const data = await client.request<unknown>('GET', `/notepads/${encodeURIComponent(id)}`)
-  return notepadSchema.parse(data)
+
+  // 兼容两种响应形状：直接对象，或 { notepad: {...} } 包裹（未实测，联调容错）
+  const raw =
+    data !== null && typeof data === 'object' && 'notepad' in (data as Record<string, unknown>)
+      ? (data as Record<string, unknown>).notepad
+      : data
+
+  return notepadSchema.parse(raw)
 }
 
 export interface NotepadPayload

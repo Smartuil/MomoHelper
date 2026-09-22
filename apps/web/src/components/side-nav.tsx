@@ -13,6 +13,12 @@ const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/forget', label: '遗忘词', icon: 'trending-down' },
   { href: '/confusion', label: '易混词', icon: 'swap' },
   { href: '/ask', label: '问词', icon: 'message' },
+  { href: '/content', label: '词库', icon: 'book' },
+  { href: '/plan', label: '计划', icon: 'calendar' },
+  { href: '/extract', label: '提取', icon: 'file-text' },
+  { href: '/review', label: '复盘', icon: 'clipboard' },
+  { href: '/wordcloud', label: '词云', icon: 'cloud' },
+  { href: '/notepads', label: '词本', icon: 'archive' },
   { href: '/connect', label: '连接墨墨', icon: 'link' }
 ]
 

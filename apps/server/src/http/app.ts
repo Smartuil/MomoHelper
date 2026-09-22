@@ -6,11 +6,17 @@ import { errorHandler } from './middleware/error.js'
 import { authRoutes } from './routes/auth.js'
 import { askRoutes } from './routes/ask.js'
 import { confusionRoutes } from './routes/confusion.js'
+import { contentRoutes } from './routes/content.js'
 import { dashboardRoutes } from './routes/dashboard.js'
+import { extractRoutes } from './routes/extract.js'
+import { forgetRoutes } from './routes/forget.js'
 import { healthRoutes } from './routes/health.js'
 import { maimemoRoutes } from './routes/maimemo.js'
 import { notepadRoutes } from './routes/notepads.js'
+import { planRoutes } from './routes/plan.js'
+import { reviewRoutes } from './routes/review.js'
 import { systemRoutes } from './routes/system.js'
+import { wordcloudRoutes } from './routes/wordcloud.js'
 
 /**
  * HTTP 应用装配。
@@ -43,9 +49,15 @@ export function createApp(): Hono
   api.route('/', authRoutes)
   api.route('/', maimemoRoutes)
   api.route('/', dashboardRoutes)
+  api.route('/', forgetRoutes)
   api.route('/', confusionRoutes)
   api.route('/', askRoutes)
+  api.route('/', contentRoutes)
   api.route('/', notepadRoutes)
+  api.route('/', planRoutes)
+  api.route('/', extractRoutes)
+  api.route('/', reviewRoutes)
+  api.route('/', wordcloudRoutes)
   api.route('/', systemRoutes)
 
   app.route('/api', api)

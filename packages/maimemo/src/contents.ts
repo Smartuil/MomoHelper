@@ -71,6 +71,8 @@ function makeContentModule<TDraft extends object, TListKey extends string>(
 
 export interface InterpretationDraft
 {
+  /** 墨墨侧内容 ID（list 返回；删除时需要，ASSUMPTION：字段名未实测） */
+  id?: string
   /** ASSUMPTION：字段名未实测 */
   voc_id: string
   content: string
@@ -81,6 +83,7 @@ export const interpretations = (client: MaimemoClient): ContentModule<Interpreta
     path: 'interpretations',
     listKey: 'interpretations',
     toDraft: (raw) => ({
+      ...(raw['id'] === undefined ? {} : { id: String(raw['id']) }),
       voc_id: String(raw['voc_id'] ?? ''),
       content: String(raw['content'] ?? '')
     })
@@ -90,6 +93,7 @@ export const interpretations = (client: MaimemoClient): ContentModule<Interpreta
 
 export interface PhraseDraft
 {
+  id?: string
   /** ASSUMPTION：字段名未实测 */
   voc_id: string
   content: string
@@ -106,6 +110,7 @@ export const phrases = (client: MaimemoClient): ContentModule<PhraseDraft> =>
     path: 'phrases',
     listKey: 'phrases',
     toDraft: (raw) => ({
+      ...(raw['id'] === undefined ? {} : { id: String(raw['id']) }),
       voc_id: String(raw['voc_id'] ?? ''),
       content: String(raw['content'] ?? ''),
       highlight_start: Number(raw['highlight_start'] ?? 0),
@@ -117,6 +122,7 @@ export const phrases = (client: MaimemoClient): ContentModule<PhraseDraft> =>
 
 export interface NoteDraft
 {
+  id?: string
   /** ASSUMPTION：字段名未实测 */
   voc_id: string
   content: string
@@ -129,6 +135,7 @@ export const notes = (client: MaimemoClient): ContentModule<NoteDraft> =>
     path: 'notes',
     listKey: 'notes',
     toDraft: (raw) => ({
+      ...(raw['id'] === undefined ? {} : { id: String(raw['id']) }),
       voc_id: String(raw['voc_id'] ?? ''),
       content: String(raw['content'] ?? ''),
       note_type: String(raw['note_type'] ?? '')
