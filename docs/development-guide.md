@@ -531,6 +531,10 @@ type ContentScene =
 
 **成本记录**：每次调用写入 `ai_generations`，记录 token 消耗。
 
+为此 `packages/ai` 的任务函数**统一返回** `GenerationOutput<T> = { data, promptTokens, completionTokens }`。
+调用点必须把两个 token 字段一并落库：只取 `data` 会让成本统计恒为 0，
+而 `ai_generations.prompt_tokens / completion_tokens` 默认为 0，不会报错、只会静默失真。
+
 ### 7.3 `packages/db`
 
 - Drizzle schema 按表拆分为独立文件。

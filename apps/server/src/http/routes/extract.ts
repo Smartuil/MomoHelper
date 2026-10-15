@@ -34,10 +34,12 @@ extractRoutes.post('/extract', async (c) =>
   }
 
   const ai = await resolveAiClient(userId)
-  const result = await extractWords(ai, parsed.data.text)
+  const generated = await extractWords(ai, parsed.data.text)
 
   // 去重并按墨墨词库分类（C12：判 data.voc）
-  const uniqueWords = [...new Set(result.words.map((word) => word.trim().toLowerCase()))].slice(0, 150)
+  const uniqueWords = [
+    ...new Set(generated.data.words.map((word) => word.trim().toLowerCase()))
+  ].slice(0, 150)
   const client = await getMaimemoClient(userId)
 
   const vocabMap = new Map<string, { id: string; spelling: string }>()
@@ -57,7 +59,9 @@ extractRoutes.post('/extract', async (c) =>
     scene: 'EXTRACT',
     model: 'deepseek-chat',
     inputDigest: `${parsed.data.text.length} chars`,
-    output: result
+    promptTokens: generated.promptTokens,
+    completionTokens: generated.completionTokens,
+    output: generated.data
   })
 
   return c.json({

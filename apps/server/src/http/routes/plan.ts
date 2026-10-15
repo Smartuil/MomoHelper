@@ -137,17 +137,20 @@ planRoutes.get('/plan/advice', async (c) =>
 
   const ai = await resolveAiClient(userId)
 
-  const advice = await generatePlanAdvice(ai, {
+  const generated = await generatePlanAdvice(ai, {
     totalWords,
     pressure,
     recentFinished
   })
+  const advice = generated.data
 
   await db.insert(aiGenerations).values({
     userId,
     scene: 'PLAN_ADVICE',
     model: 'deepseek-chat',
     inputDigest: `total=${totalWords}|pressure=${pressure.map((p) => p.count).join(',')}`,
+    promptTokens: generated.promptTokens,
+    completionTokens: generated.completionTokens,
     output: advice
   })
 

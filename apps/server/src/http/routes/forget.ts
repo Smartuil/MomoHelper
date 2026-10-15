@@ -181,23 +181,25 @@ forgetRoutes.post('/forget/diagnose', async (c) =>
 
   const ai = await resolveAiClient(userId)
 
-  const diagnosis = await diagnoseForget(ai, {
+  const generated = await diagnoseForget(ai, {
     spelling: parsed.data.spelling,
     studyCount,
     lastResponse,
     tags
   })
 
-  // 成本记录（7.2：每次调用写入 ai_generations）
+  // 成本记录（7.2：每次调用写入 ai_generations，含 token 消耗）
   await db.insert(aiGenerations).values({
     userId,
     scene: 'FORGET_DIAGNOSE',
     model: 'deepseek-reasoner',
     inputDigest: `${parsed.data.spelling}|${studyCount ?? 'na'}|${tags.join(',') || 'na'}`,
-    output: diagnosis
+    promptTokens: generated.promptTokens,
+    completionTokens: generated.completionTokens,
+    output: generated.data
   })
 
-  return c.json({ data: diagnosis })
+  return c.json({ data: generated.data })
 })
 
 const notepadSchema = z.object({

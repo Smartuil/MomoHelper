@@ -79,7 +79,8 @@ reviewRoutes.post('/review/daily/generate', async (c) =>
   }
 
   const ai = await resolveAiClient(userId)
-  const content = await generateDailyReview(ai, metrics)
+  const generatedReview = await generateDailyReview(ai, metrics)
+  const content = generatedReview.data
 
   const inserted = await db
     .insert(dailyReviews)
@@ -95,6 +96,8 @@ reviewRoutes.post('/review/daily/generate', async (c) =>
     scene: 'DAILY_REVIEW',
     model: 'deepseek-chat',
     inputDigest: `${date}|f=${snapshot.finished}/${snapshot.total}`,
+    promptTokens: generatedReview.promptTokens,
+    completionTokens: generatedReview.completionTokens,
     output: content
   })
 
@@ -238,7 +241,8 @@ async function getOrCreateReport(
   }
 
   const ai = await resolveAiClient(userId)
-  const content = await generateReport(ai, metrics)
+  const generatedReport = await generateReport(ai, metrics)
+  const content = generatedReport.data
 
   const inserted = await db
     .insert(periodicReports)
@@ -261,6 +265,8 @@ async function getOrCreateReport(
     scene: `${periodType}_REPORT`,
     model: 'deepseek-chat',
     inputDigest: `${start}~${end}|days=${snapshots.length}`,
+    promptTokens: generatedReport.promptTokens,
+    completionTokens: generatedReport.completionTokens,
     output: content
   })
 

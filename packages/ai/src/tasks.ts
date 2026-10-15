@@ -52,7 +52,7 @@ json 格式如下：
 export async function analyzeConfusion(
   client: AiClient,
   words: string[]
-): Promise<ConfusionResult>
+): Promise<GenerationOutput<ConfusionResult>>
 {
   const result = await client.complete({
     model: 'deepseek-chat',
@@ -65,7 +65,11 @@ export async function analyzeConfusion(
     temperature: 0.3
   })
 
-  return confusionResultSchema.parse(JSON.parse(result.content))
+  return {
+    data: confusionResultSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
 }
 
 /* ============================= 遗忘原因诊断（FR-3.6） ============================= */
@@ -110,7 +114,7 @@ export interface ForgetDiagnosisInput
 export async function diagnoseForget(
   client: AiClient,
   input: ForgetDiagnosisInput
-): Promise<ForgetDiagnosis>
+): Promise<GenerationOutput<ForgetDiagnosis>>
 {
   const result = await client.complete({
     model: 'deepseek-reasoner',
@@ -126,7 +130,11 @@ export async function diagnoseForget(
     temperature: 0.3
   })
 
-  return forgetReasonSchema.parse(JSON.parse(result.content))
+  return {
+    data: forgetReasonSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
 }
 
 /* ============================= AI 问词（FR-5，流式） ============================= */
@@ -352,7 +360,7 @@ export interface PlanAdviceInput
 export async function generatePlanAdvice(
   client: AiClient,
   input: PlanAdviceInput
-): Promise<PlanAdviceResult>
+): Promise<GenerationOutput<PlanAdviceResult>>
 {
   const result = await client.complete({
     model: 'deepseek-chat',
@@ -372,7 +380,11 @@ export async function generatePlanAdvice(
     temperature: 0.5
   })
 
-  return planAdviceSchema.parse(JSON.parse(result.content))
+  return {
+    data: planAdviceSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
 }
 
 /* ============================= 每日复盘（FR-12） ============================= */
@@ -394,7 +406,7 @@ json 格式：
 export async function generateDailyReview(
   client: AiClient,
   metrics: Record<string, unknown>
-): Promise<DailyReviewResult>
+): Promise<GenerationOutput<DailyReviewResult>>
 {
   const result = await client.complete({
     model: 'deepseek-chat',
@@ -407,7 +419,11 @@ export async function generateDailyReview(
     temperature: 0.5
   })
 
-  return dailyReviewSchema.parse(JSON.parse(result.content))
+  return {
+    data: dailyReviewSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
 }
 
 /* ============================= 周报 / 月报（FR-13） ============================= */
@@ -427,7 +443,7 @@ json 格式：{ "summary": "周期总结（引用数据）", "highlights": ["亮
 export async function generateReport(
   client: AiClient,
   metrics: Record<string, unknown>
-): Promise<ReportResult>
+): Promise<GenerationOutput<ReportResult>>
 {
   const result = await client.complete({
     model: 'deepseek-chat',
@@ -440,7 +456,11 @@ export async function generateReport(
     temperature: 0.5
   })
 
-  return reportSchema.parse(JSON.parse(result.content))
+  return {
+    data: reportSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
 }
 
 /* ============================= 文本生词提取（FR-10） ============================= */
@@ -462,7 +482,7 @@ json 格式：{ "words": ["candidate", "words"] }
 export async function extractWords(
   client: AiClient,
   text: string
-): Promise<ExtractWordsResult>
+): Promise<GenerationOutput<ExtractWordsResult>>
 {
   const result = await client.complete({
     model: 'deepseek-chat',
@@ -475,5 +495,9 @@ export async function extractWords(
     temperature: 0.3
   })
 
-  return extractWordsSchema.parse(JSON.parse(result.content))
+  return {
+    data: extractWordsSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
 }

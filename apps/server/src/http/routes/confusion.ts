@@ -7,7 +7,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 
 import { db } from '../../db.js'
-import { confusionGroups } from '@momo/db'
+import { aiGenerations, confusionGroups } from '@momo/db'
 import { validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
@@ -91,10 +91,15 @@ confusionRoutes.post('/confusion/analyze', async (c) =>
   const ai = await resolveAiClient(userId)
 
   let result: ConfusionResult
+  let promptTokens = 0
+  let completionTokens = 0
 
   try
   {
-    result = await analyzeConfusion(ai, parsed.data.words)
+    const generated = await analyzeConfusion(ai, parsed.data.words)
+    result = generated.data
+    promptTokens = generated.promptTokens
+    completionTokens = generated.completionTokens
   }
   catch (error)
   {
@@ -103,6 +108,17 @@ confusionRoutes.post('/confusion/analyze', async (c) =>
       `AI 分析暂时不可用：${error instanceof Error ? error.message.slice(0, 120) : '未知错误'}`
     )
   }
+
+  // 成本记录（7.2：每次调用写入 ai_generations，含 token 消耗）
+  await db.insert(aiGenerations).values({
+    userId,
+    scene: 'CONFUSION_ANALYZE',
+    model: 'deepseek-chat',
+    inputDigest: parsed.data.words.join('/').slice(0, 120),
+    promptTokens,
+    completionTokens,
+    output: result
+  })
 
   // 累积易混词组（周报「最常混淆词组」的数据源，api-capability-gap 第五节 4）
   await db
