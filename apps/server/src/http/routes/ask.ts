@@ -1,13 +1,13 @@
-import { AiClient, buildAskMessages } from '@momo/ai'
+import { buildAskMessages } from '@momo/ai'
 import { queryStudyRecords } from '@momo/maimemo'
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { z } from 'zod'
 
-import { env } from '../../config/env.js'
 import { validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
+import { resolveAiClient } from '../../services/ai-client.js'
 import { getMaimemoClient } from '../../services/maimemo-client.js'
 
 /**
@@ -61,10 +61,8 @@ askRoutes.post('/ask', async (c) =>
     }
   }
 
-  const ai = new AiClient({
-    apiKey: env.DEEPSEEK_API_KEY,
-    baseUrl: env.DEEPSEEK_BASE_URL
-  })
+  // AI 客户端统一经解析层获取：用户自带 Key 优先，服务器 .env 兜底
+  const ai = await resolveAiClient(userId)
 
   const messages = buildAskMessages(parsed.data.question, {
     spelling: parsed.data.spelling,

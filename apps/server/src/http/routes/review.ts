@@ -1,15 +1,15 @@
-import { AiClient, generateDailyReview, generateReport } from '@momo/ai'
+import { generateDailyReview, generateReport } from '@momo/ai'
 import { toBeijingDate } from '@momo/maimemo'
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
-import { env } from '../../config/env.js'
 import { db } from '../../db.js'
 import { aiGenerations, dailyReviews, dailyStudySnapshots, forgetEvents, periodicReports } from '@momo/db'
 import { validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
+import { resolveAiClient } from '../../services/ai-client.js'
 
 /**
  * 复盘与报告路由（FR-12 / 13，docs 第 8.11 节）。
@@ -78,7 +78,7 @@ reviewRoutes.post('/review/daily/generate', async (c) =>
     forgottenEvents: forgetCountRows[0]?.count ?? 0
   }
 
-  const ai = new AiClient({ apiKey: env.DEEPSEEK_API_KEY, baseUrl: env.DEEPSEEK_BASE_URL })
+  const ai = await resolveAiClient(userId)
   const content = await generateDailyReview(ai, metrics)
 
   const inserted = await db
@@ -237,7 +237,7 @@ async function getOrCreateReport(
     bestDay
   }
 
-  const ai = new AiClient({ apiKey: env.DEEPSEEK_API_KEY, baseUrl: env.DEEPSEEK_BASE_URL })
+  const ai = await resolveAiClient(userId)
   const content = await generateReport(ai, metrics)
 
   const inserted = await db

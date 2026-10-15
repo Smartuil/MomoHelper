@@ -1,4 +1,4 @@
-export { AiClient } from './client.js'
+export { AiClient, AiAuthError, AiUnavailableError } from './client.js'
 export type {
   AiModel,
   AiClientOptions,

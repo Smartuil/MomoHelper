@@ -19,7 +19,8 @@ const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/review', label: '复盘', icon: 'clipboard' },
   { href: '/wordcloud', label: '词云', icon: 'cloud' },
   { href: '/notepads', label: '词本', icon: 'archive' },
-  { href: '/connect', label: '连接墨墨', icon: 'link' }
+  { href: '/connect', label: '连接墨墨', icon: 'link' },
+  { href: '/settings', label: '设置', icon: 'sliders' }
 ]
 
 interface MeDto

@@ -13,7 +13,12 @@ const envSchema = z.object({
   MAIMEMO_TOKEN_KEY: z.string().min(1),
   MAIMEMO_TOKEN_KEY_VERSION: z.coerce.number().int().positive().default(1),
 
-  DEEPSEEK_API_KEY: z.string().min(1),
+  /**
+   * 服务器级 AI Key：可留空。
+   * 留空时只服务自带 Key 的用户（BYOK，见 ai_credentials 表），
+   * 都没有则在调用点抛 ai_key_missing，由前端引导去设置页填写。
+   */
+  DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_BASE_URL: z.string().min(1).default('https://api.deepseek.com'),
 
   SESSION_SECRET: z.string().min(16),

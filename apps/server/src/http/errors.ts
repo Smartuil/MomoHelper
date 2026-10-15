@@ -26,6 +26,11 @@ export const unauthorized = (message = '未登录'): HttpError =>
 export const tokenInvalid = (message = '墨墨 Token 无效或已过期，请重新绑定'): HttpError =>
   new HttpError('maimemo_token_invalid', 401, message)
 
+/** AI 能力不可用：既没有个人 Key，服务器也没配（前端引导去设置页） */
+export const aiKeyMissing = (
+  message = '尚未配置 AI 服务，请在设置中填写 DeepSeek API Key'
+): HttpError => new HttpError('ai_key_missing', 400, message)
+
 export const maimemoUnavailable = (message = '墨墨数据暂不可用，展示最近一次数据'): HttpError =>
   new HttpError('maimemo_unavailable', 503, message)
 

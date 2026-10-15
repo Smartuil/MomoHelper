@@ -87,6 +87,7 @@ export type ApiErrorCode =
   | 'unauthorized'
   | 'maimemo_token_invalid'
   | 'maimemo_unavailable'
+  | 'ai_key_missing'
   | 'permission_denied'
   | 'quota_exceeded'
   | 'rate_limited'
@@ -231,6 +232,38 @@ export interface QuotaDto
   used: number
   limit: 600
   remaining: number
+}
+
+/**
+ * AI 服务来源。
+ * USER：用户在设置页填了自己的 Key；
+ * SERVER：回落到服务器 .env 的 DEEPSEEK_API_KEY；
+ * NONE：两者都没有，AI 功能不可用（响应 ai_key_missing）。
+ */
+export type AiKeySource = 'USER' | 'SERVER' | 'NONE'
+
+/**
+ * AI 配置状态（GET /api/system/ai）。
+ *
+ * 绝不回传明文 Key：keyHint 只保留末 4 位供用户辨认
+ * （与「Token 明文不外泄」同一原则，约定 14.3）。
+ */
+export interface AiConfigDto
+{
+  source: AiKeySource
+  provider: string
+  /** 用户自填的 baseUrl，为空表示跟随服务器配置 */
+  baseUrl: string | null
+  keyHint: string | null
+  lastVerifiedAt: string | null
+  /** 服务器 .env 是否配了 Key（决定清空个人 Key 后是否还能用） */
+  envConfigured: boolean
+  /** 生效的 baseUrl（用户覆盖优先） */
+  effectiveBaseUrl: string
+  models: {
+    chat: string
+    reasoner: string
+  }
 }
 
 /** 今日进度（墨墨原始数据经适配层后的形态） */

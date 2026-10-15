@@ -1,14 +1,14 @@
-import { AiClient, extractWords } from '@momo/ai'
+import { extractWords } from '@momo/ai'
 import { queryVocabulary } from '@momo/maimemo'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
-import { env } from '../../config/env.js'
 import { db } from '../../db.js'
 import { aiGenerations } from '@momo/db'
 import { validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
+import { resolveAiClient } from '../../services/ai-client.js'
 import { getMaimemoClient } from '../../services/maimemo-client.js'
 
 /**
@@ -33,7 +33,7 @@ extractRoutes.post('/extract', async (c) =>
     throw validationFailed('请提供 10~6000 字的英文文本')
   }
 
-  const ai = new AiClient({ apiKey: env.DEEPSEEK_API_KEY, baseUrl: env.DEEPSEEK_BASE_URL })
+  const ai = await resolveAiClient(userId)
   const result = await extractWords(ai, parsed.data.text)
 
   // 去重并按墨墨词库分类（C12：判 data.voc）

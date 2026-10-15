@@ -1,4 +1,4 @@
-import { AiClient, diagnoseForget } from '@momo/ai'
+import { diagnoseForget } from '@momo/ai'
 import {
   advanceStudy,
   createNotepad,
@@ -15,13 +15,13 @@ import { z } from 'zod'
 import type { FocusWordDto } from '@momo/types'
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 
-import { env } from '../../config/env.js'
 import { db } from '../../db.js'
 import { aiGenerations, forgetEvents } from '@momo/db'
 import { maimemoUnavailable, permissionDenied, validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
 import { ensurePreferences } from './maimemo.js'
+import { resolveAiClient } from '../../services/ai-client.js'
 import { getMaimemoClient, isAuthError } from '../../services/maimemo-client.js'
 import { getTodayForgotten } from '../../services/dashboard.js'
 
@@ -179,10 +179,7 @@ forgetRoutes.post('/forget/diagnose', async (c) =>
     // 学习数据不可用时继续，上下文缺失由 prompt 容忍
   }
 
-  const ai = new AiClient({
-    apiKey: env.DEEPSEEK_API_KEY,
-    baseUrl: env.DEEPSEEK_BASE_URL
-  })
+  const ai = await resolveAiClient(userId)
 
   const diagnosis = await diagnoseForget(ai, {
     spelling: parsed.data.spelling,

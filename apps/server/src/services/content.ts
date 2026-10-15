@@ -1,5 +1,4 @@
 import {
-  AiClient,
   generateInterpretation,
   generateNote,
   generatePhrase,
@@ -11,11 +10,11 @@ import {
 import { beijingToday, interpretations, notes, phrases, queryStudyRecords } from '@momo/maimemo'
 import { consumeQuota, getQuotaState, QuotaExceededError } from '@momo/core'
 
-import { env } from '../config/env.js'
 import { db } from '../db.js'
 import { aiGenerations } from '@momo/db'
 import type { PermissionDto } from '@momo/types'
 import { HttpError, permissionDenied } from '../http/errors.js'
+import { resolveAiClient } from './ai-client.js'
 import { getMaimemoClient } from './maimemo-client.js'
 import { ensurePreferences } from '../http/routes/maimemo.js'
 
@@ -43,7 +42,7 @@ export async function generateSingle(
 ): Promise<ContentPayload>
 {
   const input = await buildGenerateInput(userId, params.spelling, params.scene)
-  const ai = new AiClient({ apiKey: env.DEEPSEEK_API_KEY, baseUrl: env.DEEPSEEK_BASE_URL })
+  const ai = await resolveAiClient(userId)
 
   let output: ContentPayload
   let usage = { promptTokens: 0, completionTokens: 0 }

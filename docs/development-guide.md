@@ -192,7 +192,7 @@ const exists = Boolean(response.data.voc?.length)
 | `DATABASE_URL` | 是 | — | PostgreSQL 连接串 |
 | `MAIMEMO_TOKEN_KEY` | 是 | — | base64 编码的 32 字节密钥 |
 | `MAIMEMO_TOKEN_KEY_VERSION` | 否 | `1` | 密钥轮换用 |
-| `DEEPSEEK_API_KEY` | 是 | — | DeepSeek API Key |
+| `DEEPSEEK_API_KEY` | 否 | — | 服务器级 DeepSeek Key；留空时仅服务自带 Key 的用户（见 6.14） |
 | `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | — |
 | `WECHAT_APP_ID` | 是 | — | 微信开放平台 / 小程序 AppID |
 | `WECHAT_APP_SECRET` | 是 | — | — |
@@ -401,6 +401,27 @@ OIDC 预留说明（接入墨墨开放平台后启用，当前实现只需支持
 | `client_ip` | text | 来自 `getClientIp` |
 | `created_at` | timestamptz | — |
 
+### 6.14 `ai_credentials`
+
+用户自带的大模型凭据（BYOK）。与 `maimemo_credentials` 同构：只存密文。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `user_id` | uuid PK | 一用户一条 |
+| `provider` | text | 现阶段只有 `DEEPSEEK`（预留多供应商） |
+| `ciphertext` / `iv` / `auth_tag` | text | AES-256-GCM 密文三件套 |
+| `key_version` | int | 密钥轮换 |
+| `base_url` | text null | 用户自填接入点，为空则跟随服务器 `DEEPSEEK_BASE_URL` |
+| `key_hint` | text null | Key 末 4 位，仅供设置页回显 |
+| `last_verified_at` | timestamptz null | 最近一次校验成功时间 |
+
+**AAD 作用域**：AI Key 的 AAD 为 `user_id + ':ai'`，与墨墨 Token 的 `user_id` 区分，
+防止两类密文被互换（见 `apps/server/src/security/crypto.ts`）。
+
+**取值优先级**：`ai_credentials` → `DEEPSEEK_API_KEY`。两者都没有时抛 `ai_key_missing`（400），
+由前端引导用户去设置页填写。所有 AI 调用点必须经 `resolveAiClient(userId)` 获取客户端，
+禁止直接读 `env.DEEPSEEK_API_KEY`（否则设置页填了 Key 也不生效）。
+
 ---
 
 ## 7. 后端各层规格
@@ -564,6 +585,7 @@ async function consumeQuota(userId: string, count: number): Promise<void>
 | `unauthorized` | 401 | 未登录 |
 | `maimemo_token_invalid` | 401 | 墨墨 Token 失效，需重绑（C10） |
 | `maimemo_unavailable` | 503 | 墨墨接口不可用，前端应展示降级提示（C2） |
+| `ai_key_missing` | 400 | 未配置 AI Key（个人与服务器都没有），引导去设置页 |
 | `permission_denied` | 403 | 对应写入权限未开启 |
 | `quota_exceeded` | 429 | 配额用尽（C4） |
 | `rate_limited` | 429 | 触发频控（C9） |
@@ -777,6 +799,9 @@ PENDING → RUNNING → DONE
 | GET | `/api/health` | 健康检查（免登录） |
 | GET | `/api/system/quota` | 当日配额使用情况 |
 | GET | `/api/system/tasks` | 队列与定时任务状态 |
+| GET | `/api/system/ai` | AI 服务配置状态（Key 只回末 4 位摘要，明文永不下发） |
+| PUT | `/api/system/ai` | 保存个人 DeepSeek Key（保存前探测可用性，失败不覆盖旧 Key） |
+| DELETE | `/api/system/ai` | 清除个人 Key，回落到服务器配置 |
 
 ---
 
@@ -1004,6 +1029,8 @@ PENDING → RUNNING → DONE
 - 不得在批量写入时同步等待完成（必须入队）。
 - 不得在业务代码中直接访问 `remoteAddress`。
 - 不得把主密钥、Token 明文写入日志。
+- 不得把 AI Key 明文下发前端或写入日志，读接口只能回 `key_hint` 摘要。
+- 不得在 `resolveAiClient` 之外直接读 `env.DEEPSEEK_API_KEY`。
 - 不得用 `success` 字段判断单词是否存在（C12）。
 - 不得对 `voc_id` / `notepad_id` 的格式做任何假设。
 

@@ -5,7 +5,7 @@ const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12
 const KEY_LENGTH = 32
 
-/** 与 maimemo_credentials 表字段一一对应（PRD 第 8.1 节） */
+/** 与 maimemo_credentials / ai_credentials 表字段一一对应（PRD 第 8.1 节） */
 export interface EncryptedToken
 {
   ciphertext: string
@@ -13,6 +13,15 @@ export interface EncryptedToken
   authTag: string
   keyVersion: number
 }
+
+/**
+ * 凭据作用域。
+ *
+ * 同一张用户下可能存多类第三方凭据，若都用 userId 作 AAD，
+ * 密文之间可以互相替换（把 AI Key 密文塞进墨墨 Token 字段）。
+ * 加作用域后缀即可隔离，且不改变密钥与算法。
+ */
+export type CredentialScope = 'ai'
 
 /**
  * 读取主密钥。
@@ -32,16 +41,22 @@ function getKey(): Buffer
 }
 
 /**
- * 加密墨墨 Token。
+ * 构造附加认证数据（AAD）。
  *
- * 每次写入重新生成 IV；以 userId 作为附加认证数据（AAD），
- * 防止密文被跨用户替换。
+ * 不传 scope 时退化为 userId 本身——这是墨墨 Token 的历史行为，
+ * 已落库的密文必须继续按此解密，不能擅自改前缀。
  */
-export function encryptToken(plaintext: string, userId: string): EncryptedToken
+function buildAad(userId: string, scope?: CredentialScope): Buffer
+{
+  return Buffer.from(scope ? `${userId}:${scope}` : userId, 'utf8')
+}
+
+/** 每次写入重新生成 IV，AAD 由调用方决定 */
+function seal(plaintext: string, aad: Buffer): EncryptedToken
 {
   const iv = randomBytes(IV_LENGTH)
   const cipher = createCipheriv(ALGORITHM, getKey(), iv)
-  cipher.setAAD(Buffer.from(userId, 'utf8'))
+  cipher.setAAD(aad)
 
   const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
 
@@ -53,15 +68,11 @@ export function encryptToken(plaintext: string, userId: string): EncryptedToken
   }
 }
 
-/**
- * 解密墨墨 Token。
- *
- * AAD 不匹配（如 userId 被篡改）会直接抛出异常，不会返回错误明文。
- */
-export function decryptToken(record: EncryptedToken, userId: string): string
+/** AAD 不匹配（userId 被篡改或密文被移用）会直接抛异常，不会返回错误明文 */
+function open(record: EncryptedToken, aad: Buffer): string
 {
   const decipher = createDecipheriv(ALGORITHM, getKey(), Buffer.from(record.iv, 'base64'))
-  decipher.setAAD(Buffer.from(userId, 'utf8'))
+  decipher.setAAD(aad)
   decipher.setAuthTag(Buffer.from(record.authTag, 'base64'))
 
   const plaintext = Buffer.concat([
@@ -70,4 +81,43 @@ export function decryptToken(record: EncryptedToken, userId: string): string
   ])
 
   return plaintext.toString('utf8')
+}
+
+/** 加密墨墨 Token（AAD = userId，历史行为，勿改） */
+export function encryptToken(plaintext: string, userId: string): EncryptedToken
+{
+  return seal(plaintext, buildAad(userId))
+}
+
+/** 解密墨墨 Token */
+export function decryptToken(record: EncryptedToken, userId: string): string
+{
+  return open(record, buildAad(userId))
+}
+
+/** 加密带作用域的凭据（当前仅 AI Key 使用） */
+export function encryptScopedSecret(
+  plaintext: string,
+  userId: string,
+  scope: CredentialScope
+): EncryptedToken
+{
+  return seal(plaintext, buildAad(userId, scope))
+}
+
+/** 解密带作用域的凭据 */
+export function decryptScopedSecret(
+  record: EncryptedToken,
+  userId: string,
+  scope: CredentialScope
+): string
+{
+  return open(record, buildAad(userId, scope))
+}
+
+/** 生成仅供 UI 回显的 Key 摘要（末 4 位），不足以还原密钥 */
+export function hintKey(apiKey: string): string
+{
+  const tail = apiKey.slice(-4)
+  return tail ? `****${tail}` : '****'
 }

@@ -2,17 +2,16 @@ import { analyzeConfusion } from '@momo/ai'
 import type { ConfusionResult } from '@momo/ai'
 import type { FocusWordDto } from '@momo/types'
 import { findSimilarWords } from '@momo/core'
-import { AiClient } from '@momo/ai'
 import { getTodayItems, queryStudyRecords } from '@momo/maimemo'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
-import { env } from '../../config/env.js'
 import { db } from '../../db.js'
 import { confusionGroups } from '@momo/db'
 import { validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
+import { resolveAiClient } from '../../services/ai-client.js'
 import { getMaimemoClient, isAuthError } from '../../services/maimemo-client.js'
 
 /**
@@ -89,10 +88,7 @@ confusionRoutes.post('/confusion/analyze', async (c) =>
     throw validationFailed('需要提供 2~5 个待对比的单词')
   }
 
-  const ai = new AiClient({
-    apiKey: env.DEEPSEEK_API_KEY,
-    baseUrl: env.DEEPSEEK_BASE_URL
-  })
+  const ai = await resolveAiClient(userId)
 
   let result: ConfusionResult
 

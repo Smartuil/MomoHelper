@@ -52,6 +52,31 @@ export const maimemoCredentials = pgTable('maimemo_credentials', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 })
 
+/**
+ * 用户自带的大模型凭据（BYOK）。
+ *
+ * 与 maimemo_credentials 同构：只存密文，明文 Key 绝不落库、绝不回传前端。
+ * AAD 带 'ai' 作用域，与墨墨 Token 的密文不可互换（见 security/crypto.ts）。
+ * 表为空时回落到服务器 .env 的 DEEPSEEK_API_KEY。
+ */
+export const aiCredentials = pgTable('ai_credentials', {
+  /** 一用户一条 */
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  /** 预留多家供应商，现阶段只有 DEEPSEEK */
+  provider: text('provider').notNull().default('DEEPSEEK'),
+  ciphertext: text('ciphertext').notNull(),
+  iv: text('iv').notNull(),
+  authTag: text('auth_tag').notNull(),
+  keyVersion: integer('key_version').notNull().default(1),
+  /** 用户自填的接入点（如自建代理），为空表示跟随服务器 DEEPSEEK_BASE_URL */
+  baseUrl: text('base_url'),
+  /** Key 末 4 位，仅用于设置页回显，不足以还原密钥 */
+  keyHint: text('key_hint'),
+  lastVerifiedAt: timestamp('last_verified_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})
+
 export const userPreferences = pgTable('user_preferences', {
   userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   /** 写入权限默认全关（保守策略，AC-6.1） */
@@ -85,6 +110,7 @@ export const operationLogs = pgTable(
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   credential: one(maimemoCredentials),
+  aiCredential: one(aiCredentials),
   preferences: one(userPreferences),
   operationLogs: many(operationLogs)
 }))

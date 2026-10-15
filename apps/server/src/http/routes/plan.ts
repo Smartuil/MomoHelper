@@ -1,16 +1,16 @@
-import { AiClient, generatePlanAdvice } from '@momo/ai'
+import { generatePlanAdvice } from '@momo/ai'
 import { addWords, queryStudyRecords, queryVocabulary, toBeijingDate } from '@momo/maimemo'
 import { desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 
-import { env } from '../../config/env.js'
 import { db } from '../../db.js'
 import { aiGenerations, dailyStudySnapshots } from '@momo/db'
 import { permissionDenied, validationFailed } from '../errors.js'
 import type { AppEnv } from '../middleware/session.js'
 import { requireSession } from '../middleware/session.js'
 import { ensurePreferences } from './maimemo.js'
+import { resolveAiClient } from '../../services/ai-client.js'
 import { getMaimemoClient } from '../../services/maimemo-client.js'
 
 /**
@@ -135,10 +135,13 @@ planRoutes.get('/plan/advice', async (c) =>
     .reverse()
     .map((row) => ({ date: row.snapshotDate, finished: row.finished }))
 
-  const advice = await generatePlanAdvice(
-    new AiClient({ apiKey: env.DEEPSEEK_API_KEY, baseUrl: env.DEEPSEEK_BASE_URL }),
-    { totalWords, pressure, recentFinished }
-  )
+  const ai = await resolveAiClient(userId)
+
+  const advice = await generatePlanAdvice(ai, {
+    totalWords,
+    pressure,
+    recentFinished
+  })
 
   await db.insert(aiGenerations).values({
     userId,
