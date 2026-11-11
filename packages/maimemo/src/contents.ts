@@ -1,4 +1,4 @@
-import type { MaimemoClient } from './client.js'
+import type { MaimemoClient } from './client'
 
 /**
  * 自定义释义 / 例句 / 助记三类内容接口（C1：只能读写用户自己创建的内容）。

@@ -1,11 +1,11 @@
-export { AiClient, AiAuthError, AiUnavailableError } from './client.js'
+export { AiClient, AiAuthError, AiUnavailableError } from './client'
 export type {
   AiModel,
   AiClientOptions,
   ChatMessage,
   CompletionParams,
   CompletionResult
-} from './client.js'
+} from './client'
 export {
   confusionResultSchema,
   forgetReasonSchema,
@@ -28,7 +28,7 @@ export {
   generateDailyReview,
   generateReport,
   extractWords
-} from './tasks.js'
+} from './tasks'
 export type {
   ConfusionResult,
   ForgetDiagnosis,
@@ -43,4 +43,4 @@ export type {
   DailyReviewResult,
   ReportResult,
   ExtractWordsResult
-} from './tasks.js'
+} from './tasks'

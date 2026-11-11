@@ -5,8 +5,8 @@ import type {
 } from '@momo/types'
 import { z } from 'zod'
 
-import type { MaimemoClient } from './client.js'
-import { MaimemoStudyUnavailableError } from './errors.js'
+import type { MaimemoClient } from './client'
+import { MaimemoStudyUnavailableError } from './errors'
 
 /**
  * 学习数据接口（公测，C2）。

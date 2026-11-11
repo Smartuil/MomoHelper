@@ -1,7 +1,7 @@
 import type { MaimemoNotepad } from '@momo/types'
 import { z } from 'zod'
 
-import type { MaimemoClient } from './client.js'
+import type { MaimemoClient } from './client'
 
 /**
  * 云词本接口（C8 / C11 / C13）。

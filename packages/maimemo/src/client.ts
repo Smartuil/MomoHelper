@@ -1,12 +1,12 @@
 import type { MaimemoEnvelope, MaimemoEnvelopeError } from '@momo/types'
 
-import { MaimemoRateLimiter } from './rate-limiter.js'
+import { MaimemoRateLimiter } from './rate-limiter'
 import {
   MaimemoApiError,
   MaimemoAuthError,
   MaimemoNetworkError,
   MaimemoRateLimitError
-} from './errors.js'
+} from './errors'
 
 const DEFAULT_BASE_URL = 'https://open.maimemo.com/open/api/v1/memo'
 

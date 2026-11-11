@@ -1,13 +1,14 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
-import { apiFetch, ApiError } from '@/lib/api'
-import type { DashboardHistoryDto, DashboardTodayDto, DashboardTrendPointDto } from '@momo/types'
+import { MaimemoAuthError } from '@momo/maimemo'
+import type { DashboardTrendPointDto } from '@momo/types'
 import { Icon } from '@/components/icons'
 import { ErrorNote, PageHeader, Tile, TileSkeleton } from '@/components/kit'
+import { getDashboardHistory, getDashboardToday, MaimemoNotConfiguredError } from '@/lib/maimemo'
 
 function beijingDate(d: Date): string
 {
@@ -137,30 +138,20 @@ const METRICS = [
   { key: 'forgottenWords', label: '遗忘', icon: 'zap', color: 'var(--color-forget)' }
 ] as const
 
-/** 今日看板（FR-2）：Bento 瓷贴布局 + 14 天趋势 */
+/** 今日看板：浏览器直连墨墨，成功即留存当日快照 */
 export default function DashboardPage()
 {
-  const queryClient = useQueryClient()
-
   const query = useQuery({
     queryKey: ['dashboard', 'today'],
-    queryFn: () => apiFetch<DashboardTodayDto>('/api/dashboard/today')
+    queryFn: () => getDashboardToday()
   })
 
-  const history = useQuery({
-    queryKey: ['dashboard', 'history'],
-    queryFn: () =>
-      apiFetch<DashboardHistoryDto>('/api/dashboard/history?days=14')
-  })
-
-  const refresh = useMutation({
-    mutationFn: () => apiFetch<DashboardTodayDto>('/api/dashboard/refresh', { method: 'POST' }),
-    onSuccess: (data) =>
-    {
-      queryClient.setQueryData(['dashboard', 'today'], data)
-      void queryClient.invalidateQueries({ queryKey: ['dashboard', 'history'] })
-    }
-  })
+  // 趋势从本地快照读取：每次成功拉取（capturedAt 变化）即重算
+  const capturedAt = query.data?.capturedAt
+  const trendDays = useMemo(
+    () => (capturedAt ? buildDays(getDashboardHistory(14).days) : null),
+    [capturedAt]
+  )
 
   if (query.isPending)
   {
@@ -176,25 +167,30 @@ export default function DashboardPage()
 
   if (query.isError)
   {
-    const err = query.error as ApiError
+    const err = query.error
+    const needSetup = err instanceof MaimemoNotConfiguredError || err instanceof MaimemoAuthError
 
     return (
       <Tile hover={false} className="mt-16 text-center">
         <Icon name="alert" className="mx-auto h-8 w-8 text-[var(--color-vague)]" />
         <h1 className="mt-3 font-[family-name:var(--font-display)] text-[var(--text-lg)]">
-          看板加载失败
+          {needSetup ? '需要先配置墨墨 Token' : '看板加载失败'}
         </h1>
         <p className="mx-auto mt-1 max-w-md text-[var(--text-sm)] text-[var(--color-text-muted)]">
-          {err.message}
+          {err instanceof MaimemoNotConfiguredError
+            ? '尚未绑定墨墨 Token，绑定后即可看到今日学习情况。'
+            : err instanceof MaimemoAuthError
+              ? '墨墨 Token 已失效或无效，请到设置页重新绑定。'
+              : err.message}
         </p>
         <div className="mt-5 flex justify-center gap-3">
-          {err.code === 'maimemo_token_invalid' || err.code === 'unauthorized' ? (
+          {needSetup ? (
             <Link
-              href="/connect"
+              href="/settings"
               className="inline-flex h-9 items-center rounded-md bg-[var(--color-accent)] px-5 text-[var(--text-sm)] font-medium text-white hover:bg-[var(--color-accent-hover)]"
             >
-              <Icon name="link" className="mr-2 h-4 w-4" />
-              去连接墨墨
+              <Icon name="sliders" className="mr-2 h-4 w-4" />
+              去设置
             </Link>
           ) : (
             <button
@@ -214,7 +210,6 @@ export default function DashboardPage()
   const rate = data.completionRate ?? 0
   const ringR = 62
   const ringC = 2 * Math.PI * ringR
-  const trendDays = history.data ? buildDays(history.data.days) : null
 
   return (
     <div>
@@ -230,15 +225,15 @@ export default function DashboardPage()
         actions={
           <button
             type="button"
-            onClick={() => refresh.mutate()}
-            disabled={refresh.isPending}
+            onClick={() => void query.refetch()}
+            disabled={query.isFetching}
             className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-[var(--text-sm)] shadow-[var(--shadow-tile)] transition-all hover:-translate-y-px hover:shadow-[var(--shadow-tile-hover)] disabled:opacity-50"
           >
             <Icon
               name="refresh"
-              className={`h-4 w-4 ${refresh.isPending ? 'animate-spin' : ''}`}
+              className={`h-4 w-4 ${query.isFetching ? 'animate-spin' : ''}`}
             />
-            {refresh.isPending ? '刷新中…' : '刷新数据'}
+            {query.isFetching ? '刷新中…' : '刷新数据'}
           </button>
         }
       />
@@ -375,8 +370,8 @@ export default function DashboardPage()
             {(
               [
                 { href: '/ask', icon: 'message', label: 'AI 问词', desc: '结合学习数据提问' },
-                { href: '/confusion', icon: 'swap', label: '易混词诊断', desc: '形近词 AI 对比' },
-                { href: '/forget', icon: 'trending-down', label: '遗忘词分析', desc: '今日遗忘与顽固词' }
+                { href: '/forget', icon: 'trending-down', label: '遗忘词分析', desc: '今日遗忘与顽固词' },
+                { href: '/settings', icon: 'sliders', label: '设置凭据', desc: 'Token 与 AI Key' }
               ] as const
             ).map((item) => (
               <li key={item.href}>

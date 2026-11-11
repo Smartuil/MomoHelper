@@ -50,6 +50,8 @@ export interface CompletionParams
   jsonMode?: boolean
   maxTokens?: number
   temperature?: number
+  /** 中止信号：浏览器端「停止生成」用，abort 时 fetch 抛 AbortError */
+  signal?: AbortSignal
 }
 
 export interface CompletionResult
@@ -74,6 +76,7 @@ export class AiClient
   {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
+      signal: params.signal,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json'
@@ -165,6 +168,7 @@ export class AiClient
   {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
+      signal: params.signal,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json'

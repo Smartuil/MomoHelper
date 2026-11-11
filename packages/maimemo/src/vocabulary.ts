@@ -1,7 +1,7 @@
 import type { MaimemoVocabulary } from '@momo/types'
 import { z } from 'zod'
 
-import type { MaimemoClient } from './client.js'
+import type { MaimemoClient } from './client'
 
 /**
  * 单词查询接口。

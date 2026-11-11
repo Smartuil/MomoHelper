@@ -13,6 +13,9 @@ importers:
       '@momo/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@momo/maimemo':
+        specifier: workspace:*
+        version: link:../../packages/maimemo
       '@momo/types':
         specifier: workspace:*
         version: link:../../packages/types

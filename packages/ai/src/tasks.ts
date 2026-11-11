@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { AiClient } from './client.js'
+import type { AiClient } from './client'
 
 /**
  * AI 任务封装：prompt 固定部分前置（命中上下文缓存，V4），

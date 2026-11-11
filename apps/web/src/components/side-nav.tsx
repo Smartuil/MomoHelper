@@ -4,66 +4,31 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { apiFetch } from '@/lib/api'
-import type { TokenStatusDto } from '@momo/types'
+import { getDeepSeekKey, getMaimemoTokenStatus } from '@/lib/settings'
 import { Icon, type IconName } from './icons'
 
+/** 纯前端方案只保留核心三件套 + 设置 */
 const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/', label: '今日', icon: 'gauge' },
   { href: '/forget', label: '遗忘词', icon: 'trending-down' },
-  { href: '/confusion', label: '易混词', icon: 'swap' },
   { href: '/ask', label: '问词', icon: 'message' },
-  { href: '/content', label: '词库', icon: 'book' },
-  { href: '/plan', label: '计划', icon: 'calendar' },
-  { href: '/extract', label: '提取', icon: 'file-text' },
-  { href: '/review', label: '复盘', icon: 'clipboard' },
-  { href: '/wordcloud', label: '词云', icon: 'cloud' },
-  { href: '/notepads', label: '词本', icon: 'archive' },
-  { href: '/connect', label: '连接墨墨', icon: 'link' },
   { href: '/settings', label: '设置', icon: 'sliders' }
 ]
 
-interface MeDto
-{
-  userId: string
-  nickname: string
-  avatarUrl: string | null
-}
-
-function useMe(): MeDto | null
+/** 本地凭据快照：同步读 localStorage，TanStack Query 只负责跨组件同步 */
+function useLocalStatus()
 {
   const query = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: () => apiFetch<MeDto>('/api/auth/me'),
-    staleTime: 5 * 60_000,
+    queryKey: ['settings', 'status'],
+    queryFn: () => ({
+      token: getMaimemoTokenStatus(),
+      hasAiKey: getDeepSeekKey() !== null
+    }),
+    staleTime: 0,
     retry: false
   })
 
   return query.data ?? null
-}
-
-function useTokenDot(): string
-{
-  const query = useQuery({
-    queryKey: ['maimemo', 'token'],
-    queryFn: () => apiFetch<TokenStatusDto>('/api/maimemo/token'),
-    staleTime: 60_000,
-    retry: false
-  })
-
-  const status = query.data?.status
-
-  if (status === 'ACTIVE')
-  {
-    return 'bg-[var(--color-familiar)]'
-  }
-
-  if (status === 'EXPIRED')
-  {
-    return 'bg-[var(--color-vague)]'
-  }
-
-  return 'bg-[var(--color-border-strong)]'
 }
 
 function Brand()
@@ -106,34 +71,51 @@ function NavLink({ item, active }: { item: (typeof ITEMS)[number]; active: boole
   )
 }
 
-/** 用户卡：头像首字 + 昵称 + Token 状态点 */
-function UserCard()
+/** 凭据状态卡：数据全部存本机浏览器，不经过任何服务器 */
+function StatusCard()
 {
-  const me = useMe()
-  const dot = useTokenDot()
+  const status = useLocalStatus()
+  const token = status?.token
+  const expired = token?.expired ?? false
+  const connected = token?.hasToken ?? false
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-subtle)] px-3 py-2.5">
+    <Link
+      href="/settings"
+      className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-subtle)] px-3 py-2.5 transition-colors hover:border-[var(--color-border-strong)]"
+    >
       <span
         aria-hidden
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-info-bg)] font-[family-name:var(--font-display)] text-sm font-semibold text-[var(--color-info)]"
       >
-        {me?.nickname?.[0] ?? '访'}
+        <Icon name="user" className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1 leading-tight">
-        <p className="truncate text-[var(--text-sm)] font-medium">
-          {me?.nickname ?? '未登录'}
-        </p>
-        <p className="flex items-center gap-1.5 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
-          <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-          {dot === 'bg-[var(--color-familiar)]' ? '墨墨已连接' : '墨墨未连接'}
+        <p className="text-[var(--text-sm)] font-medium">本机直连</p>
+        <p className="flex items-center gap-1.5 truncate text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+              connected && !expired
+                ? 'bg-[var(--color-familiar)]'
+                : connected
+                  ? 'bg-[var(--color-vague)]'
+                  : 'bg-[var(--color-border-strong)]'
+            }`}
+          />
+          {!connected
+            ? '未配置凭据'
+            : expired
+              ? '墨墨 Token 已过期'
+              : `墨墨已连接 · 剩 ${token?.remainingDays ?? '?'} 天`}
+          {status?.hasAiKey ? ' · AI 已配置' : ' · AI 未配置'}
         </p>
       </div>
-    </div>
+    </Link>
   )
 }
 
-/** 桌面侧边栏（ui-design-spec 3.1 的看板化升级） */
+/** 桌面侧边栏 */
 export function SideNav()
 {
   const pathname = usePathname()
@@ -155,7 +137,7 @@ export function SideNav()
           ))}
         </ul>
       </div>
-      <UserCard />
+      <StatusCard />
     </nav>
   )
 }

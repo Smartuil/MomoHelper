@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { baseUrl } from '@/lib/stream'
 import { Icon } from '@/components/icons'
 import { ErrorNote, PageHeader, Tile } from '@/components/kit'
+import { askStream } from '@/lib/ai'
 
 /**
- * AI 问词（FR-5）：SSE 流式回答。
- * 首字 < 3s（NFR-1.3）；回答结合真实学习数据，服务器端注入。
+ * AI 问词：浏览器直连 DeepSeek 流式接口。
+ * 回答自动注入该词的真实学习数据（学习次数 / 顽固标记）；
+ * 未绑定墨墨时也能提问，只是缺少学习上下文。
  */
 export default function AskPage()
 {
@@ -21,7 +22,7 @@ export default function AskPage()
   const answerRef = useRef('')
   const abortRef = useRef<AbortController | null>(null)
 
-  // 卸载时中断进行中的流，避免泄漏与对已卸载组件 setState
+  // 卸载时中断进行中的流
   useEffect(
     () => () =>
     {
@@ -37,7 +38,9 @@ export default function AskPage()
 
   async function submit(): Promise<void>
   {
-    if (!question.trim() || busy)
+    const text = question.trim()
+
+    if (!text || busy)
     {
       return
     }
@@ -52,114 +55,27 @@ export default function AskPage()
 
     try
     {
-      const response = await fetch(`${baseUrl()}/api/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        signal: controller.signal,
-        body: JSON.stringify({ question, spelling: spelling || undefined })
-      })
-
-      if (!response.ok || !response.body)
-      {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null
-
-        throw new Error(body?.error?.message ?? '请求失败')
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      // 从 buffer 中解析完整的 SSE 事件；返回是否遇到 error 事件。
-      // 非 flush：只处理已收尾（\n\n 结束）的事件，残余留在 buffer；
-      // flush：流结束后清空全部残留（含 decoder 尾字节与最后一条未收尾事件）。
-      const consume = (flush: boolean): boolean =>
-      {
-        if (flush)
+      await askStream(
+        text,
+        spelling.trim() || undefined,
+        (delta) =>
         {
-          buffer += decoder.decode()
-        }
-
-        const parts = buffer.split('\n\n')
-        buffer = flush ? '' : (parts.pop() ?? '')
-
-        for (const event of parts)
-        {
-          for (const line of event.split('\n'))
-          {
-            if (!line.startsWith('data:'))
-            {
-              continue
-            }
-
-            try
-            {
-              const payload = JSON.parse(line.slice(5).trim()) as {
-                event: string
-                text?: string
-                message?: string
-              }
-
-              if (payload.event === 'delta' && payload.text)
-              {
-                answerRef.current += payload.text
-                setAnswer(answerRef.current)
-              }
-
-              if (payload.event === 'error')
-              {
-                setError(payload.message ?? 'AI 服务暂时不可用')
-                return true
-              }
-            }
-            catch
-            {
-              // 忽略无法解析的分片（如心跳）
-            }
-          }
-        }
-
-        return false
-      }
-
-      let failed = false
-
-      for (;;)
-      {
-        const { done, value } = await reader.read()
-
-        if (done)
-        {
-          break
-        }
-
-        buffer += decoder.decode(value, { stream: true })
-        failed = consume(false)
-
-        if (failed)
-        {
-          break
-        }
-      }
-
-      // 流结束后 flush 残留字节（多字节字符可能被切断）与最后一条未收尾的事件
-      if (!failed)
-      {
-        consume(true)
-      }
+          answerRef.current += delta
+          setAnswer(answerRef.current)
+        },
+        controller.signal
+      )
     }
     catch (err)
     {
+      // 用户主动停止不算错误
       if (err instanceof DOMException && err.name === 'AbortError')
       {
-        // 用户主动停止，不算错误
+        // 忽略
       }
       else
       {
-        setError(err instanceof Error ? err.message : '请求失败')
+        setError(err instanceof Error ? err.message : '请求失败，请稍后重试')
       }
     }
     finally
