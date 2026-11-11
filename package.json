@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm --filter @momo/server dev",
+    "dev": "pnpm --filter @momo/web dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   }
