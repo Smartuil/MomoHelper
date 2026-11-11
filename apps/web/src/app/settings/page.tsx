@@ -19,7 +19,6 @@ import {
   clearMaimemoToken,
   getDeepSeekKey,
   getMaimemoTokenStatus,
-  MAIMEMO_TOKEN_TTL_DAYS,
   setDeepSeekKey,
   setMaimemoToken
 } from '@/lib/settings'
@@ -104,7 +103,7 @@ export default function SettingsPage()
     {
       if (error instanceof MaimemoAuthError)
       {
-        setTokenError('Token 无效：墨墨返回鉴权失败，请确认是「墨墨 App → 更多设置 → 实验功能 → 开放 API」里复制的那串，且未过期')
+        setTokenError('Token 无效：墨墨返回鉴权失败，请到「墨墨 App → 更多设置 → 实验功能 → 开放 API」重新复制后再试')
       }
       else if (error instanceof MaimemoApiError)
       {
@@ -112,7 +111,7 @@ export default function SettingsPage()
       }
       else if (error instanceof MaimemoNetworkError)
       {
-        setTokenError('网络连接失败：浏览器无法直连墨墨接口，请检查网络或稍后重试')
+        setTokenError('网络连接失败：无法连接墨墨接口代理，请检查网络或稍后重试')
       }
       else if (error instanceof MaimemoRateLimitError)
       {
@@ -141,7 +140,7 @@ export default function SettingsPage()
   const saveKey = useMutation({
     mutationFn: async (value: string) =>
     {
-      // 保存前探测：401/403 = Key 无效；连不上则不保存（沿用后端版逻辑）
+      // 保存前探测：401/403 = Key 无效；连不上则不保存
       await verifyDeepSeekKey(value)
       setDeepSeekKey(value)
     },
@@ -185,7 +184,7 @@ export default function SettingsPage()
     <div className="mx-auto max-w-[720px]">
       <PageHeader
         title="设置"
-        description="凭据只存在本机浏览器（localStorage），不经过任何服务器"
+        description="凭据只存在本机浏览器；墨墨请求经本站同源代理转发，代理不存储数据"
       />
 
       {/* 墨墨 Token */}
@@ -201,7 +200,7 @@ export default function SettingsPage()
             <div>
               <h2 className="text-[var(--text-md)] font-semibold">墨墨 Token</h2>
               <p className="text-[var(--text-xs)] text-[var(--color-text-subtle)]">
-                墨墨 App → 更多设置 → 实验功能 中开启并复制；有效期 {MAIMEMO_TOKEN_TTL_DAYS} 天
+                墨墨 App → 更多设置 → 实验功能 中开启并复制；鉴权失败时重新复制
               </p>
             </div>
           </div>
@@ -221,37 +220,17 @@ export default function SettingsPage()
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-[var(--color-bg-subtle)] px-4 py-3">
               <p className="flex items-center gap-2 text-[var(--text-sm)]">
                 <Icon name="check" className="h-4 w-4 text-[var(--color-familiar)]" />
-                {token.expired
-                  ? 'Token 已过期，请重新绑定'
-                  : token.remainingDays === null
-                    ? '已绑定'
-                    : `已绑定 · 预计 ${token.remainingDays} 天后过期`}
+                已绑定 · 鉴权失败时重新复制
               </p>
               <span className="tabular font-[family-name:var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-subtle)]">
-                {token.expiresAt
-                  ? new Date(token.expiresAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-                  : ''}
+                {token.boundAt
+                  ? `绑定于 ${new Date(token.boundAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`
+                  : '绑定时间未记录'}
               </span>
             </div>
-            {token.expiresAt && (
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-bg-subtle)]">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    token.expired
-                      ? 'bg-[var(--color-forget)]'
-                      : token.remainingDays !== null && token.remainingDays <= 2
-                        ? 'bg-[var(--color-vague)]'
-                        : 'bg-[var(--color-familiar)]'
-                  }`}
-                  style={{
-                    width:
-                      token.remainingDays === null
-                        ? '100%'
-                        : `${Math.max(0, Math.min(100, (token.remainingDays / MAIMEMO_TOKEN_TTL_DAYS) * 100))}%`
-                  }}
-                />
-              </div>
-            )}
+            <p className="mt-2 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+              墨墨未公开 Token 过期时间，也没有刷新接口；是否失效以接口返回的鉴权结果为准。
+            </p>
             <div className="mt-3">
               <button
                 type="button"
@@ -434,8 +413,8 @@ export default function SettingsPage()
       <Tile index={2} hover={false} className="mt-4">
         <p className="text-[var(--text-sm)] text-[var(--color-text-muted)]">
           说明：本工具是纯前端应用，你的墨墨 Token 与 DeepSeek Key
-          只保存在这台设备的浏览器里；网页直接调用墨墨与 DeepSeek
-          的开放接口，请求从你本机发出，不经过任何中间服务器。清除浏览器站点数据会同时清除凭据与学习快照。
+          只保存在这台设备的浏览器里。DeepSeek 由浏览器直连；墨墨请求经本站
+          同源代理 /api/memo/* 转发，代理只转发、不存储。清除浏览器站点数据会同时清除凭据与学习快照。
         </p>
       </Tile>
     </div>

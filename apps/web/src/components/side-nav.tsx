@@ -75,9 +75,7 @@ function NavLink({ item, active }: { item: (typeof ITEMS)[number]; active: boole
 function StatusCard()
 {
   const status = useLocalStatus()
-  const token = status?.token
-  const expired = token?.expired ?? false
-  const connected = token?.hasToken ?? false
+  const connected = status?.token.hasToken ?? false
 
   return (
     <Link
@@ -91,23 +89,15 @@ function StatusCard()
         <Icon name="user" className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1 leading-tight">
-        <p className="text-[var(--text-sm)] font-medium">本机直连</p>
+        <p className="text-[var(--text-sm)] font-medium">本机凭据</p>
         <p className="flex items-center gap-1.5 truncate text-[var(--text-xs)] text-[var(--color-text-subtle)]">
           <span
             aria-hidden
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-              connected && !expired
-                ? 'bg-[var(--color-familiar)]'
-                : connected
-                  ? 'bg-[var(--color-vague)]'
-                  : 'bg-[var(--color-border-strong)]'
+              connected ? 'bg-[var(--color-familiar)]' : 'bg-[var(--color-border-strong)]'
             }`}
           />
-          {!connected
-            ? '未配置凭据'
-            : expired
-              ? '墨墨 Token 已过期'
-              : `墨墨已连接 · 剩 ${token?.remainingDays ?? '?'} 天`}
+          {connected ? '墨墨已连接' : '未配置凭据'}
           {status?.hasAiKey ? ' · AI 已配置' : ' · AI 未配置'}
         </p>
       </div>

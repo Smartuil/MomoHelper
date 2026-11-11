@@ -3,7 +3,8 @@
  *
  * 墨墨 Token 与 DeepSeek Key 只存在当前浏览器的 localStorage：
  * 单用户自用工具，无后端、无数据库，凭据不离开本机。
- * 墨墨 Token 有效期 7 天且无刷新机制（真机实测），绑定时间用于计算过期提醒。
+ * 墨墨未公开 Token 过期时间，也没有刷新接口，是否失效以接口鉴权结果为准，
+ * 因此这里只记录绑定时间，不做有效期倒计时。
  */
 
 const STORAGE_KEYS = {
@@ -12,18 +13,11 @@ const STORAGE_KEYS = {
   deepseekKey: 'momo.deepseekKey'
 } as const
 
-/** 墨墨个人 Token 有效期：7 天（C10，实测无刷新机制） */
-export const MAIMEMO_TOKEN_TTL_DAYS = 7
-
 export interface MaimemoTokenStatus
 {
   hasToken: boolean
+  /** 绑定时间（ISO）；旧数据没有记录时为 null */
   boundAt: string | null
-  /** 预计过期时间（ISO），未绑定为 null */
-  expiresAt: string | null
-  /** 距过期剩余整天数；已过期为 0 */
-  remainingDays: number | null
-  expired: boolean
 }
 
 function read(key: string): string | null
@@ -69,7 +63,7 @@ export function getMaimemoToken(): string | null
   return read(STORAGE_KEYS.maimemoToken)
 }
 
-/** 绑定成功后调用：记录绑定时间，用于计算 7 天有效期 */
+/** 绑定成功后调用：记录绑定时间，供设置页展示 */
 export function setMaimemoToken(token: string): void
 {
   write(STORAGE_KEYS.maimemoToken, token.trim())
@@ -85,30 +79,13 @@ export function clearMaimemoToken(): void
 export function getMaimemoTokenStatus(): MaimemoTokenStatus
 {
   const token = getMaimemoToken()
-  const boundAt = read(STORAGE_KEYS.tokenBoundAt)
 
   if (!token)
   {
-    return { hasToken: false, boundAt: null, expiresAt: null, remainingDays: null, expired: false }
+    return { hasToken: false, boundAt: null }
   }
 
-  const boundMs = boundAt ? Date.parse(boundAt) : Number.NaN
-
-  if (Number.isNaN(boundMs))
-  {
-    // 有 Token 但没有绑定时间（旧数据）：只提示已绑定，不算有效期
-    return { hasToken: true, boundAt: null, expiresAt: null, remainingDays: null, expired: false }
-  }
-
-  const expiresMs = boundMs + MAIMEMO_TOKEN_TTL_DAYS * 86_400_000
-
-  return {
-    hasToken: true,
-    boundAt,
-    expiresAt: new Date(expiresMs).toISOString(),
-    remainingDays: Math.max(0, Math.floor((expiresMs - Date.now()) / 86_400_000)),
-    expired: Date.now() >= expiresMs
-  }
+  return { hasToken: true, boundAt: read(STORAGE_KEYS.tokenBoundAt) }
 }
 
 // ============================ DeepSeek Key ============================
