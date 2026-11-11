@@ -39,6 +39,12 @@ export class MaimemoNotConfiguredError extends Error
   }
 }
 
+/**
+ * 墨墨请求走同源代理：EdgeOne 边缘函数把 /api/memo/* 转发给墨墨（服务器间
+ * 请求不带 Origin，绕过墨墨对跨域请求的 403 限制）。见 edge-functions/api/memo/[[default]].js
+ */
+const MAIMEMO_PROXY_BASE = '/api/memo'
+
 /** 每次调用现取 Token：设置页换绑后无需重建任何实例 */
 export function getMaimemoClient(): MaimemoClient
 {
@@ -49,7 +55,7 @@ export function getMaimemoClient(): MaimemoClient
     throw new MaimemoNotConfiguredError()
   }
 
-  return new MaimemoClient({ token })
+  return new MaimemoClient({ token, baseUrl: MAIMEMO_PROXY_BASE })
 }
 
 /**
@@ -58,7 +64,7 @@ export function getMaimemoClient(): MaimemoClient
  */
 export async function verifyMaimemoToken(token: string): Promise<void>
 {
-  const client = new MaimemoClient({ token })
+  const client = new MaimemoClient({ token, baseUrl: MAIMEMO_PROXY_BASE })
   await listNotepads(client)
 }
 
