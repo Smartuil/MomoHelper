@@ -19,7 +19,7 @@ import {
   getStudyProgress,
   getTodayItems,
   queryStudyRecords,
-  queryVocabulary
+  listNotepads
 } from '@momo/maimemo'
 import type {
   DashboardHistoryDto,
@@ -52,11 +52,14 @@ export function getMaimemoClient(): MaimemoClient
   return new MaimemoClient({ token })
 }
 
-/** 校验新粘贴的 Token：查一个必然存在的词，401 即无效（原后端绑定同款逻辑） */
+/**
+ * 校验新粘贴的 Token：调 notepads 列表（轻量、稳定、不依赖学习数据公测权限）。
+ * 401/鉴权失败 → MaimemoAuthError；网络失败 → MaimemoNetworkError；其余视为通过。
+ */
 export async function verifyMaimemoToken(token: string): Promise<void>
 {
   const client = new MaimemoClient({ token })
-  await queryVocabulary(client, ['test'])
+  await listNotepads(client)
 }
 
 // ============================ 每日快照 ============================

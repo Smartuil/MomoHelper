@@ -4,7 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { AiAuthError } from '@momo/ai'
-import { MaimemoAuthError } from '@momo/maimemo'
+import {
+  MaimemoAuthError,
+  MaimemoApiError,
+  MaimemoNetworkError,
+  MaimemoRateLimitError
+} from '@momo/maimemo'
 import { Icon } from '@/components/icons'
 import { ErrorNote, PageHeader, Tile } from '@/components/kit'
 import { verifyDeepSeekKey } from '@/lib/ai'
@@ -97,13 +102,26 @@ export default function SettingsPage()
     },
     onError: (error) =>
     {
-      setTokenError(
-        error instanceof MaimemoAuthError
-          ? 'Token 无效：墨墨返回鉴权失败，请检查是否复制完整、是否已过期'
-          : error instanceof Error
-            ? error.message
-            : '校验失败，请稍后重试'
-      )
+      if (error instanceof MaimemoAuthError)
+      {
+        setTokenError('Token 无效：墨墨返回鉴权失败，请确认是「墨墨 App → 更多设置 → 实验功能 → 开放 API」里复制的那串，且未过期')
+      }
+      else if (error instanceof MaimemoApiError)
+      {
+        setTokenError(`墨墨接口返回错误 [${error.code}]，可能是账号权限或接口暂不可用，请稍后重试`)
+      }
+      else if (error instanceof MaimemoNetworkError)
+      {
+        setTokenError('网络连接失败：浏览器无法直连墨墨接口，请检查网络或稍后重试')
+      }
+      else if (error instanceof MaimemoRateLimitError)
+      {
+        setTokenError('触发墨墨请求频控，请稍等几十秒再试')
+      }
+      else
+      {
+        setTokenError(error instanceof Error ? error.message : '校验失败，请稍后重试')
+      }
     }
   })
 
