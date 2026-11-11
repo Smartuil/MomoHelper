@@ -1,9 +1,8 @@
 /**
- * DeepSeek 客户端（OpenAI 兼容协议，docs/development-guide.md 第 7.2 节）。
+ * DeepSeek 客户端（OpenAI 兼容协议，原生 fetch 实现）。
  *
- * 用原生 fetch，不引入 openai SDK，减少 1G 内存机器的依赖体积。
+ * 不引入 openai SDK，保持依赖体积精简。
  * 模型分配：
- *   - 释义 / 例句 / 助记生成、易混词对比 → deepseek-chat
  *   - 遗忘原因推测 → deepseek-reasoner
  *   - AI 问词（交互式流式）→ deepseek-chat
  */

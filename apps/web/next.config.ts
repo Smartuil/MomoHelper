@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next'
 
 /**
- * 静态导出：构建产物由 Nginx（宝塔站点）托管，不占用 Node 进程
- * （docs/tech-stack.md「Web」节）。
+ * 静态导出：产物 apps/web/out 交由 EdgeOne Pages 托管；
+ * 同源 /api/memo/* 由 edge-functions 下的代理函数处理。
  */
 const nextConfig: NextConfig = {
   output: 'export',

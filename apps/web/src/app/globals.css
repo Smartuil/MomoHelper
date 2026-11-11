@@ -1,11 +1,10 @@
 @import 'tailwindcss';
 
-/* 手动切换深色模式（ui-design-spec 2.1） */
+/* 手动切换深色模式 */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
  * 设计 token：暖纸底 × Bento 瓷贴（个人中心看板方向）
- * 语义色沿用 docs/ui-design-spec.md 第 2 节；几何与阴影为看板化升级。
  */
 @theme
 {

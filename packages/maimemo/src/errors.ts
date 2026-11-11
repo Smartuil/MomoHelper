@@ -1,10 +1,10 @@
 /**
- * 墨墨 API 错误体系（docs/development-guide.md 第 7.1 节错误映射）。
+ * 墨墨 API 错误体系。
  *
  * HTTP 401 / common_unauthorized → MaimemoAuthError，标记 Token 为 INVALID
  * HTTP 429                       → 由客户端限流排队，服务端仍 429 时退避重试
  * 网络错误                        → MaimemoNetworkError
- * 学习数据接口不可用               → MaimemoStudyUnavailableError，触发降级（C2）
+ * 学习数据接口不可用               → MaimemoStudyUnavailableError，触发本地快照降级
  */
 export class MaimemoError extends Error
 {

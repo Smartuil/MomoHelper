@@ -1,14 +1,14 @@
 /**
- * 墨墨 Open API 浏览器直连层。
+ * 墨墨 Open API 访问层（经 EdgeOne 同源代理）。
  *
- * open.maimemo.com 对浏览器 CORS 全开（2026-11-11 实测：反射 Origin、
- * 放行 Authorization 头与 GET/POST/DELETE），因此无需后端代理。
- * 数据封装复用 @momo/maimemo —— 真机实测过的 Envelope 解析、错误映射
- * 与 UTC+8 日期处理（响应包裹层、tags 数组等实测结论都封装在里面）。
+ * 墨墨不允许浏览器跨域直连：带 Origin 的真实 GET/POST 一律 403 且无 CORS 头，
+ * 因此请求发往同源 /api/memo/*，由 edge-functions/api/memo/[[default]].js
+ * 以服务端身份转发到 open.maimemo.com。
+ * 数据封装复用 @momo/maimemo：Envelope 解析、错误映射与 UTC+8 日期处理。
  *
  * 每日快照存 localStorage：替代原后端的快照表 + 定时任务。
- * 墨墨没有历史序列接口（C3），趋势完全依赖快照；纯前端下没有无人值守
- * 采集，打开页面当天才会留一个点，未打开的日期在趋势图上缺一天。
+ * 墨墨没有历史序列接口，趋势完全依赖快照；纯前端下没有无人值守采集，
+ * 打开页面当天才会留一个点，未打开的日期在趋势图上缺一天。
  */
 
 import {

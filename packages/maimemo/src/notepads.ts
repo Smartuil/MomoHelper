@@ -4,14 +4,10 @@ import { z } from 'zod'
 import type { MaimemoClient } from './client'
 
 /**
- * 云词本接口（C8 / C11 / C13）。
- *
- * C11：更新要求全字段必填且整体覆盖，并发写会互相覆盖，
- * 调用方必须配合平台侧串行化或乐观锁（notepad_mappings.content_version）。
- * C8：不支持删除单个单词，删除词只能 GET 全量 → 修改 → 整体覆盖。
+ * 云词本列表：目前唯一用途是校验用户粘贴的墨墨 Token。
+ * 实测列表条目不含 content（只有详情接口返回），因此按可选字段容错。
  */
 
-// 实测：notepads 列表接口的条目不含 content（只有详情返回），必须容错
 const notepadSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -29,62 +25,4 @@ export async function listNotepads(client: MaimemoClient): Promise<MaimemoNotepa
   const parsed = listSchema.parse(data)
 
   return (parsed.notepads ?? []).map((raw) => notepadSchema.parse(raw))
-}
-
-export async function getNotepad(client: MaimemoClient, id: string): Promise<MaimemoNotepad>
-{
-  const data = await client.request<unknown>('GET', `/notepads/${encodeURIComponent(id)}`)
-
-  // 兼容两种响应形状：直接对象，或 { notepad: {...} } 包裹（未实测，联调容错）
-  const raw =
-    data !== null && typeof data === 'object' && 'notepad' in (data as Record<string, unknown>)
-      ? (data as Record<string, unknown>).notepad
-      : data
-
-  return notepadSchema.parse(raw)
-}
-
-export interface NotepadPayload
-{
-  title: string
-  content: string
-  tags?: string[]
-}
-
-/** 创建云词本。tags 为自由字符串数组（合法值字典由平台侧定义，Q3）。 */
-export async function createNotepad(client: MaimemoClient, payload: NotepadPayload): Promise<MaimemoNotepad>
-{
-  const data = await client.request<unknown>(
-    'POST',
-    '/notepads',
-    { title: payload.title, content: payload.content, tags: payload.tags ?? [] },
-    { retries: 0 }
-  )
-
-  return notepadSchema.parse(data)
-}
-
-/**
- * 更新云词本（全字段覆盖，C11）。
- * 调用方必须先 getNotepad 取最新内容再合并提交，禁止盲写。
- */
-export async function updateNotepad(
-  client: MaimemoClient,
-  id: string,
-  payload: NotepadPayload
-): Promise<MaimemoNotepad>
-{
-  const data = await client.request<unknown>(
-    'POST',
-    `/notepads/${encodeURIComponent(id)}`,
-    { title: payload.title, content: payload.content, tags: payload.tags ?? [] },
-    { retries: 0 }
-  )
-
-  return notepadSchema.parse(data)
-}
-
-export async function deleteNotepad(client: MaimemoClient, id: string): Promise<void>
-{
-  await client.request('DELETE', `/notepads/${encodeURIComponent(id)}`, undefined, { retries: 0 })
 }

@@ -6,7 +6,7 @@
  * 流式问答走浏览器原生 ReadableStream（streamComplete 内部已封装）。
  *
  * prompt 与输出校验复用 @momo/ai：buildAskMessages / diagnoseForget，
- * AI 输出一律经 Zod 校验后才交给 UI（约定 4.3.7，纯前端方案同样遵守）。
+ * AI 输出一律经 Zod 校验后才交给 UI。
  */
 
 import {

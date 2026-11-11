@@ -1,19 +1,17 @@
 /**
- * 共享类型与枚举（docs/development-guide.md 第 7.1 / 7.2 节）。
- *
- * 本包不依赖任何运行时，前后端共用。
- * 墨墨 API 的字段命名保持服务端原样（snake_case），平台 API 用 camelCase。
+ * 三件核心功能用到的共享类型。
+ * 墨墨 API 字段保持服务端原样（snake_case），页面 DTO 用 camelCase。
  */
 
 /* ============================= 墨墨 API 域 ============================= */
 
-/** 今日作答结果（实测字段值，api-capability-gap.md 第七节） */
+/** 今日作答结果 */
 export type StudyResponse = 'FORGET' | 'VAGUE' | 'FAMILIAR'
 
-/** 单词级标签：字符串数组，多数为空数组（不可假设为枚举字符串，实测结论五） */
+/** 单词级标签：实测为字符串数组，多数为空数组 */
 export type StudyRecordTag = 'STICKING' | 'WELL_FAMILIAR'
 
-/** 墨墨响应统一包裹层（实测结论三：技能文档未记载） */
+/** 墨墨响应统一包裹层 */
 export interface MaimemoEnvelopeError
 {
   code: string
@@ -26,16 +24,6 @@ export interface MaimemoEnvelope<T>
   errors: MaimemoEnvelopeError[]
   data: T
   success: boolean
-}
-
-/**
- * Vocabulary 只有两个字段（api-capability-gap.md 第二节）。
- * 无音标、词频、词根等任何词典数据（C6）。
- */
-export interface MaimemoVocabulary
-{
-  id: string
-  spelling: string
 }
 
 /** 今日进度（单点快照）。study_time 为毫秒。 */
@@ -57,7 +45,7 @@ export interface MaimemoStudyTodayItem
   is_finished: boolean
 }
 
-/** 单词级学习记录。日期字段按 UTC+8 日期边界存储（C14）。 */
+/** 单词级学习记录。日期字段按 UTC+8 日期边界存储。 */
 export interface MaimemoStudyRecord
 {
   voc_id: string
@@ -72,7 +60,7 @@ export interface MaimemoStudyRecord
   tags: StudyRecordTag[]
 }
 
-/** 云词本（content 可能是不规范内容，C13，解析必须容错） */
+/** 云词本（目前仅用于校验 Token，列表条目可能不含 content） */
 export interface MaimemoNotepad
 {
   id: string
@@ -81,101 +69,16 @@ export interface MaimemoNotepad
   tags?: string[]
 }
 
-/* ============================= 平台统一响应 ============================= */
+/* ============================= 页面 DTO ============================= */
 
-export type ApiErrorCode =
-  | 'unauthorized'
-  | 'maimemo_token_invalid'
-  | 'maimemo_unavailable'
-  | 'ai_key_missing'
-  | 'permission_denied'
-  | 'quota_exceeded'
-  | 'rate_limited'
-  | 'not_found'
-  | 'validation_failed'
-  | 'internal_error'
-
-export interface ApiSuccess<T>
-{
-  data: T
-}
-
-export interface ApiFailure
-{
-  error: {
-    code: ApiErrorCode
-    message: string
-  }
-}
-
-/* ============================= 平台业务枚举 ============================= */
-
-/** 墨墨 Token 状态（C10：有效期 7 天，无刷新机制） */
-export type TokenStatus = 'ACTIVE' | 'EXPIRED' | 'INVALID'
-
-/**
- * 凭据来源。
- * MANUAL：用户粘贴个人 token（现阶段唯一来源）；
- * OIDC：墨墨开放平台授权登录（预留，接入后启用）。
- */
-export type CredentialType = 'MANUAL' | 'OIDC'
-
-/** 内容写入任务类型（释义 / 例句 / 助记共用 600 条/天配额，C4） */
-export type ContentJobType = 'INTERPRETATION' | 'PHRASE' | 'NOTE'
-
-/** 生成场景 */
-export type ContentScene =
-  | 'CONCISE'
-  | 'EXAM'
-  | 'WORK'
-  | 'TECH'
-  | 'PAPER'
-  | 'CONTRAST'
-
-export type ContentJobStatus =
-  | 'PENDING'
-  | 'RUNNING'
-  | 'PAUSED'
-  | 'DONE'
-  | 'FAILED'
-  | 'CANCELLED'
-
-export type ContentItemStatus =
-  | 'PENDING'
-  | 'RUNNING'
-  | 'DONE'
-  | 'FAILED'
-  | 'SKIPPED'
-
-/** 遗忘原因固定枚举（用于分类统计，PRD FR-3.6） */
-export type ForgetReason =
-  | 'SPELLING_SIMILAR'
-  | 'ABSTRACT_MEANING'
-  | 'RARE_SENSE'
-  | 'CN_MEANING_CONFLICT'
-  | 'COLLOCATION_WEAK'
-  | 'ROOT_DIVERGENCE'
-  | 'LACK_CONTEXT'
-
-/** 遗忘事件来源（FR-15.5：平台自行累积，不依赖 API） */
-export type ForgetEventSource = 'TODAY_ITEMS' | 'STUDY_RECORDS'
-
-/** 易混词发现方式（C6：本地编辑距离或 AI 推测） */
-export type ConfusionSource = 'EDIT_DISTANCE' | 'AI'
-
-/** 周报 / 月报 */
-export type ReportPeriodType = 'WEEKLY' | 'MONTHLY'
-
-/* ============================= 平台 DTO ============================= */
-
-/** 今日看板（GET /api/dashboard/today，docs/development-guide.md 第 8.3 节） */
+/** 今日看板 */
 export interface DashboardTodayDto
 {
   total: number
   finished: number
   remaining: number
   studyTimeMs: number
-  /** total = 0 时返回 null，不出现除零（AC-2.3） */
+  /** total = 0 时返回 null，不出现除零 */
   completionRate: number | null
   newWords: number
   reviewWords: number
@@ -197,86 +100,7 @@ export interface FocusWordDto
   tags: StudyRecordTag[]
 }
 
-/** 遗忘词区间查询（近似统计，AC-3.2 响应必须带 approximate） */
-export interface ForgetRangeDto
-{
-  approximate: true
-  description: string
-  words: FocusWordDto[]
-}
-
-/** Token 状态（GET /api/maimemo/token） */
-export interface TokenStatusDto
-{
-  status: TokenStatus
-  credentialType: CredentialType
-  expiresAt: string | null
-  lastVerifiedAt: string | null
-}
-
-/** 写入权限开关（默认全关，保守策略） */
-export interface PermissionDto
-{
-  allowInterpretation: boolean
-  allowPhrase: boolean
-  allowNote: boolean
-  allowNotepad: boolean
-  allowStudyPlan: boolean
-}
-
-/** 配额状态（GET /api/system/quota） */
-export interface QuotaDto
-{
-  /** 配额归属日期（北京时间） */
-  quotaDate: string
-  used: number
-  limit: 600
-  remaining: number
-}
-
-/**
- * AI 服务来源。
- * USER：用户在设置页填了自己的 Key；
- * SERVER：回落到服务器 .env 的 DEEPSEEK_API_KEY；
- * NONE：两者都没有，AI 功能不可用（响应 ai_key_missing）。
- */
-export type AiKeySource = 'USER' | 'SERVER' | 'NONE'
-
-/**
- * AI 配置状态（GET /api/system/ai）。
- *
- * 绝不回传明文 Key：keyHint 只保留末 4 位供用户辨认
- * （与「Token 明文不外泄」同一原则，约定 14.3）。
- */
-export interface AiConfigDto
-{
-  source: AiKeySource
-  provider: string
-  /** 用户自填的 baseUrl，为空表示跟随服务器配置 */
-  baseUrl: string | null
-  keyHint: string | null
-  lastVerifiedAt: string | null
-  /** 服务器 .env 是否配了 Key（决定清空个人 Key 后是否还能用） */
-  envConfigured: boolean
-  /** 生效的 baseUrl（用户覆盖优先） */
-  effectiveBaseUrl: string
-  models: {
-    chat: string
-    reasoner: string
-  }
-}
-
-/** 今日进度（墨墨原始数据经适配层后的形态） */
-export interface StudyProgressDto
-{
-  finished: number
-  total: number
-  studyTimeMs: number
-  dataReliable: boolean
-  capturedAt: string
-}
-
-/** 学习趋势单日数据点（来自每日快照，GET /api/dashboard/history） */
+/** 学习趋势单日数据点（来自 localStorage 每日快照） */
 export interface DashboardTrendPointDto
 {
   /** 北京时区日期，YYYY-MM-DD */
@@ -287,7 +111,7 @@ export interface DashboardTrendPointDto
   isReliable: boolean
 }
 
-/** 学习趋势序列（GET /api/dashboard/history） */
+/** 学习趋势序列 */
 export interface DashboardHistoryDto
 {
   days: DashboardTrendPointDto[]
