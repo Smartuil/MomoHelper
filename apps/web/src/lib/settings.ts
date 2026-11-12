@@ -104,3 +104,21 @@ export function clearDeepSeekKey(): void
 {
   remove(STORAGE_KEYS.deepseekKey)
 }
+
+/**
+ * 设置页与侧栏共用的本地状态快照。
+ * 两处必须使用同一个 queryFn，避免同一 queryKey 缓存进不同形状的数据。
+ */
+export interface LocalStatus
+{
+  token: MaimemoTokenStatus
+  hasAiKey: boolean
+}
+
+export function getLocalStatus(): LocalStatus
+{
+  return {
+    token: getMaimemoTokenStatus(),
+    hasAiKey: getDeepSeekKey() !== null
+  }
+}

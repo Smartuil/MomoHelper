@@ -18,7 +18,7 @@ import {
   clearDeepSeekKey,
   clearMaimemoToken,
   getDeepSeekKey,
-  getMaimemoTokenStatus,
+  getLocalStatus,
   setDeepSeekKey,
   setMaimemoToken
 } from '@/lib/settings'
@@ -33,12 +33,12 @@ export default function SettingsPage()
 
   const statusQuery = useQuery({
     queryKey: ['settings', 'status'],
-    queryFn: () => getMaimemoTokenStatus(),
+    queryFn: getLocalStatus,
     staleTime: 0,
     retry: false
   })
 
-  const token = statusQuery.data ?? null
+  const token = statusQuery.data?.token ?? null
 
   const [tokenInput, setTokenInput] = useState('')
   const [showTokenInput, setShowTokenInput] = useState(false)

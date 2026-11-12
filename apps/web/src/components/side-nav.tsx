@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { getDeepSeekKey, getMaimemoTokenStatus } from '@/lib/settings'
+import { getLocalStatus } from '@/lib/settings'
 import { Icon, type IconName } from './icons'
 
 /** 纯前端方案只保留核心三件套 + 设置 */
@@ -15,15 +15,12 @@ const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/settings', label: '设置', icon: 'sliders' }
 ]
 
-/** 本地凭据快照：同步读 localStorage，TanStack Query 只负责跨组件同步 */
+/** 本地凭据快照：与设置页共用 getLocalStatus，保证同一 queryKey 数据形状一致 */
 function useLocalStatus()
 {
   const query = useQuery({
     queryKey: ['settings', 'status'],
-    queryFn: () => ({
-      token: getMaimemoTokenStatus(),
-      hasAiKey: getDeepSeekKey() !== null
-    }),
+    queryFn: getLocalStatus,
     staleTime: 0,
     retry: false
   })
@@ -75,7 +72,7 @@ function NavLink({ item, active }: { item: (typeof ITEMS)[number]; active: boole
 function StatusCard()
 {
   const status = useLocalStatus()
-  const connected = status?.token.hasToken ?? false
+  const connected = status?.token?.hasToken ?? false
 
   return (
     <Link
