@@ -106,7 +106,7 @@ export function TodayWordsCard({ words }: { words: TodayWordRowDto[] })
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-[var(--color-border)] rounded-md border border-[var(--color-border)]">
-          {filtered.map((word) =>
+          {filtered.map((word, i) =>
           {
             const response = word.firstResponse
               ? RESPONSE_LABELS[word.firstResponse]
@@ -118,7 +118,7 @@ export function TodayWordsCard({ words }: { words: TodayWordRowDto[] })
                 className="grid grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[var(--color-bg-subtle)]"
               >
                 <span className="tabular font-[family-name:var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-subtle)]">
-                  {word.order}
+                  {i + 1}
                 </span>
                 <span className="min-w-0 truncate">
                   <span className="font-[family-name:var(--font-display)] text-[var(--text-md)]">
