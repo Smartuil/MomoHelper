@@ -71,6 +71,17 @@ export interface MaimemoNotepad
 
 /* ============================= 页面 DTO ============================= */
 
+/** 今日词表明细行（今日页面词表卡用） */
+export interface TodayWordRowDto
+{
+  vocId: string
+  spelling: string
+  order: number
+  isNew: boolean
+  isFinished: boolean
+  firstResponse?: StudyResponse
+}
+
 /** 今日看板 */
 export interface DashboardTodayDto
 {
@@ -86,6 +97,8 @@ export interface DashboardTodayDto
   forgottenWords: number
   dataReliable: boolean
   capturedAt: string
+  /** 今日词表明细（dataReliable = false 时为空——快照不存词表） */
+  todayWords: TodayWordRowDto[]
 }
 
 /** 需要关注的单词条目（看板 / 遗忘词列表共用） */

@@ -24,7 +24,8 @@ import {
 import type {
   DashboardHistoryDto,
   DashboardTodayDto,
-  FocusWordDto
+  FocusWordDto,
+  TodayWordRowDto
 } from '@momo/types'
 
 import { getMaimemoToken } from './settings'
@@ -113,11 +114,12 @@ function upsertSnapshot(snapshot: LocalSnapshot): void
   }
 }
 
-/** 最近一次快照转看板数据：dataReliable = false，UI 标注「可能不是最新」（C2） */
+/** 最近一次快照转看板数据：dataReliable = false，UI 标注「可能不是最新」（C2）；快照不存词表明细，todayWords 为空 */
 function latestSnapshotAsToday(): DashboardTodayDto
 {
   const list = loadSnapshots()
   const snapshot = list[list.length - 1]
+  const emptyWords: TodayWordRowDto[] = []
 
   if (!snapshot)
   {
@@ -132,7 +134,8 @@ function latestSnapshotAsToday(): DashboardTodayDto
       unfinishedWords: 0,
       forgottenWords: 0,
       dataReliable: false,
-      capturedAt: new Date().toISOString()
+      capturedAt: new Date().toISOString(),
+      todayWords: emptyWords
     }
   }
 
@@ -147,7 +150,8 @@ function latestSnapshotAsToday(): DashboardTodayDto
     unfinishedWords: 0,
     forgottenWords: 0,
     dataReliable: false,
-    capturedAt: snapshot.capturedAt
+    capturedAt: snapshot.capturedAt,
+    todayWords: emptyWords
   }
 }
 
@@ -176,6 +180,18 @@ export async function getDashboardToday(): Promise<DashboardTodayDto>
       (item) => item.is_finished && item.first_response === 'FORGET'
     ).length
 
+    // 词表明细按 order 排序（今日词表卡逐行展示）
+    const todayWords: TodayWordRowDto[] = [...items]
+      .sort((a, b) => a.order - b.order)
+      .map((item) => ({
+        vocId: item.voc_id,
+        spelling: item.voc_spelling,
+        order: item.order,
+        isNew: item.is_new,
+        isFinished: item.is_finished,
+        firstResponse: item.first_response
+      }))
+
     upsertSnapshot({
       date: beijingToday(),
       finished: progress.finished,
@@ -195,7 +211,8 @@ export async function getDashboardToday(): Promise<DashboardTodayDto>
       unfinishedWords,
       forgottenWords,
       dataReliable: true,
-      capturedAt: new Date().toISOString()
+      capturedAt: new Date().toISOString(),
+      todayWords
     }
   }
   catch (error)
