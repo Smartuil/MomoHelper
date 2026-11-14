@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Icon } from '@/components/icons'
+import { Markdown } from '@/components/markdown'
 import { ErrorNote, PageHeader, Segmented, Tile } from '@/components/kit'
 import { askStream } from '@/lib/ai'
 import {
@@ -222,15 +223,15 @@ export default function AskPage()
             >
               <Icon name="zap" className="h-4 w-4" />
             </span>
-            <p className="min-w-0 whitespace-pre-wrap text-[var(--text-base)] leading-relaxed">
-              {answer}
+            <div className="min-w-0 flex-1">
+              <Markdown text={answer} />
               {busy && (
                 <span
                   aria-hidden
                   className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-[var(--color-accent)] align-middle"
                 />
               )}
-            </p>
+            </div>
           </div>
         </Tile>
       )}
