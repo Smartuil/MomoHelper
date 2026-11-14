@@ -49,6 +49,12 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   'chevron-right': <path d="M9 6l6 6-6 6" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.6-3.6" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="9" />

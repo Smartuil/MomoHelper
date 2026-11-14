@@ -372,6 +372,7 @@ export default function DashboardPage()
               [
                 { href: '/ask', icon: 'message', label: 'AI 问词', desc: '结合学习数据提问' },
                 { href: '/forget', icon: 'trending-down', label: '遗忘词分析', desc: '今日遗忘与顽固词' },
+                { href: '/library', icon: 'book', label: '词库总览', desc: '掌握度分布与全量词表' },
                 { href: '/settings', icon: 'sliders', label: '设置凭据', desc: 'Token 与 AI Key' }
               ] as const
             ).map((item) => (

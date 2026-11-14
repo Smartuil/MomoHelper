@@ -9,11 +9,12 @@ import { getLocalStatus } from '@/lib/settings'
 import { applyTheme, currentTheme, storeTheme, type ThemeMode } from '@/lib/theme'
 import { Icon, type IconName } from './icons'
 
-/** 纯前端方案只保留核心三件套 + 设置 */
+/** 纯前端方案只保留核心三件套 + 词库 + 设置 */
 const ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/', label: '今日', icon: 'gauge' },
   { href: '/forget', label: '遗忘词', icon: 'trending-down' },
   { href: '/ask', label: '问词', icon: 'message' },
+  { href: '/library', label: '词库', icon: 'book' },
   { href: '/settings', label: '设置', icon: 'sliders' }
 ]
 

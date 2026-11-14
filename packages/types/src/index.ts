@@ -129,3 +129,73 @@ export interface DashboardHistoryDto
 {
   days: DashboardTrendPointDto[]
 }
+
+/* ============================= 词库 ============================= */
+
+/** 词库词表行：query_study_records 全字段的 camelCase 版 */
+export interface LibraryRecordRowDto
+{
+  vocId: string
+  spelling: string
+  /** 学习次数（每日最多计 1 次） */
+  studyCount: number
+  lastResponse?: StudyResponse
+  tags: StudyRecordTag[]
+  addDate?: string
+  firstStudyDate?: string
+  lastStudyDate?: string
+  nextStudyDate?: string
+}
+
+/** 通用计数桶（掌握度分桶 / 标签分布 / 作答分布共用） */
+export interface LibraryBucketDto
+{
+  key: string
+  label: string
+  count: number
+  /** 占总数比例，total = 0 时为 0 */
+  ratio: number
+}
+
+/** 词库月度聚合行 */
+export interface LibraryMonthRowDto
+{
+  /** YYYY-MM */
+  month: string
+  /** 当月加入词数（add_date） */
+  added: number
+  /** 当月首次学习词数（first_study_date） */
+  firstStudied: number
+  /** 首学 / 加入；当加入为 0 时 null */
+  retention: number | null
+  /** 截至该月累计加入词数 */
+  cumulative: number
+}
+
+/** 词库聚合结果（只存聚合、不存原始记录时用；当前页面直接用原始记录现算） */
+export interface LibraryStatsDto
+{
+  total: number
+  /** 平均学习次数，保留一位小数 */
+  avgStudyCount: number
+  /** 只学过 1 次的词数 */
+  singleStudyCount: number
+  /** 带 STICKING 标签的词数 */
+  stickingCount: number
+  countBuckets: LibraryBucketDto[]
+  tagBuckets: LibraryBucketDto[]
+  responseBuckets: LibraryBucketDto[]
+  months: LibraryMonthRowDto[]
+}
+
+/** 全量拉取结果元信息 */
+export interface LibrarySnapshotDto
+{
+  records: LibraryRecordRowDto[]
+  /** 接口 as_count 返回的总词数；拿不到时为 null */
+  total: number | null
+  /** 是否翻页取全（false 说明被分页边界或安全阀截断） */
+  complete: boolean
+  /** ISO 时间戳 */
+  fetchedAt: string
+}
