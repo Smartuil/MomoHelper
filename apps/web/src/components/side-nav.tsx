@@ -3,8 +3,10 @@
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 import { getLocalStatus } from '@/lib/settings'
+import { applyTheme, currentTheme, storeTheme, type ThemeMode } from '@/lib/theme'
 import { Icon, type IconName } from './icons'
 
 /** 纯前端方案只保留核心三件套 + 设置 */
@@ -32,9 +34,10 @@ function Brand()
 {
   return (
     <div className="flex items-center gap-2.5">
+      {/* 墨黑底白「墨」：呼应墨墨黑白猫头鹰品牌；夜间模式经 token 自动反转为白底墨字 */}
       <span
         aria-hidden
-        className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--color-accent)] font-[family-name:var(--font-display)] text-base font-bold text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--color-text)] font-[family-name:var(--font-display)] text-base font-bold text-[var(--color-bg)]"
       >
         墨
       </span>
@@ -102,6 +105,53 @@ function StatusCard()
   )
 }
 
+/** 主题切换：浅色 / 夜间。初始跟随系统（内联脚本已定），手动切换后记住 */
+function ThemeButton()
+{
+  const [theme, setTheme] = useState<ThemeMode | null>(null)
+
+  useEffect(
+    () =>
+    {
+      setTheme(currentTheme())
+    },
+    []
+  )
+
+  function toggle(): void
+  {
+    const next: ThemeMode = theme === 'dark' ? 'light' : 'dark'
+
+    setTheme(next)
+    applyTheme(next)
+    storeTheme(next)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label="切换浅色 / 夜间模式"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--color-border)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)]"
+    >
+      <Icon name={theme === 'dark' ? 'sun' : 'moon'} className="h-4 w-4" />
+    </button>
+  )
+}
+
+/** 版本号：package.json semver + 构建注入的 git 短 SHA（线上核对代码版本用） */
+function VersionTag()
+{
+  const version = process.env.NEXT_PUBLIC_APP_VERSION ?? 'dev'
+  const commit = process.env.NEXT_PUBLIC_COMMIT_SHA ?? ''
+
+  return (
+    <p className="px-2 font-[family-name:var(--font-mono)] text-[10px] tracking-wide text-[var(--color-text-subtle)]">
+      {commit ? `v${version} · ${commit}` : `v${version}`}
+    </p>
+  )
+}
+
 /** 桌面侧边栏 */
 export function SideNav()
 {
@@ -113,8 +163,9 @@ export function SideNav()
       className="sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col justify-between border-r border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 md:flex"
     >
       <div>
-        <div className="px-2">
+        <div className="flex items-center justify-between px-2">
           <Brand />
+          <ThemeButton />
         </div>
         <ul className="mt-8 space-y-1">
           {ITEMS.map((item) => (
@@ -124,7 +175,10 @@ export function SideNav()
           ))}
         </ul>
       </div>
-      <StatusCard />
+      <div>
+        <VersionTag />
+        <StatusCard />
+      </div>
     </nav>
   )
 }
@@ -138,6 +192,7 @@ export function MobileNav()
     <div className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface)]/90 px-4 py-3 backdrop-blur md:hidden">
       <div className="flex items-center justify-between">
         <Brand />
+        <ThemeButton />
       </div>
       <nav aria-label="主导航" className="-mx-1 mt-3 overflow-x-auto">
         <ul className="flex gap-1 px-1">

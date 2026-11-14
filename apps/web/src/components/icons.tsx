@@ -131,6 +131,13 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   cloud: <path d="M17.5 19a4.5 4.5 0 0 0 .4-8.98A7 7 0 0 0 4.3 12.1 4 4 0 0 0 6 19.9z" />,
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </>
+  ),
+  moon: <path d="M20.6 13.6A8.5 8.5 0 1 1 10.4 3.4a7 7 0 0 0 10.2 10.2z" />,
   archive: (
     <>
       <rect x="2" y="3" width="20" height="5" rx="1" />

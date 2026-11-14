@@ -13,7 +13,15 @@ export default function RootLayout({ children }: { children: React.ReactNode })
 {
   return (
     <html lang="zh-CN">
-      <head />
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            /* 首屏定主题：手动选择 > 系统偏好，避免静态 HTML 先白后暗闪烁 */
+            __html:
+              "(function(){try{var t=localStorage.getItem('momo.theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()"
+          }}
+        />
+      </head>
       <body className="min-h-screen">
         <Providers>
           <div className="flex min-h-screen">

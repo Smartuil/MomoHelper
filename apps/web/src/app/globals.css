@@ -4,42 +4,47 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * 设计 token：暖纸底 × Bento 瓷贴（个人中心看板方向）
+ * 设计 token：墨墨风（贴墨墨背单词 App 的真实品牌视觉）。
+ * 浅色 = 近白微绿画布 × 青绿主色(#28B69D，官网实测) × 扁平轻阴影；
+ * 夜间 = 同名 token 在 html.dark 下全量覆盖，组件零改动跟随。
+ * 语义色沿用墨墨的数据叙事：绿=完成/数据，橙红=遗忘，深蓝=学习数字。
  */
 @theme
 {
-  /* 画布：暖纸，比卡片深一档，让瓷贴浮起 */
-  --color-bg: oklch(96.8% 0.008 85);
-  --color-bg-subtle: oklch(94.6% 0.01 85);
-  --color-surface: oklch(99.4% 0.003 85);
-  --color-border: oklch(90% 0.01 80);
-  --color-border-strong: oklch(80% 0.014 80);
+  /* 画布：近白微绿，比卡片深一档，让卡片浮起 */
+  --color-bg: #f7faf9;
+  --color-bg-subtle: #eef4f1;
+  --color-surface: #ffffff;
+  --color-border: #e3ebe8;
+  --color-border-strong: #c4d4cd;
 
-  --color-text: oklch(23% 0.014 65);
-  --color-text-muted: oklch(46% 0.012 65);
-  --color-text-subtle: oklch(60% 0.01 65);
+  --color-text: #1f2a27;
+  --color-text-muted: #526460;
+  --color-text-subtle: #7f948d;
 
-  /* 语义色（响应四色，保留产品语义） */
-  --color-forget: oklch(52% 0.17 28);
-  --color-forget-bg: oklch(95% 0.025 28);
-  --color-vague: oklch(58% 0.13 65);
-  --color-vague-bg: oklch(96% 0.03 75);
-  --color-familiar: oklch(48% 0.09 155);
-  --color-familiar-bg: oklch(95% 0.025 155);
-  --color-info: oklch(48% 0.1 245);
-  --color-info-bg: oklch(95% 0.025 245);
+  /* 主色：墨墨品牌青绿 */
+  --color-accent: #28b69d;
+  --color-accent-hover: #1e9c82;
+  --color-accent-bg: #ddf2ec;
+  --color-focus: #28b69d;
 
-  --color-accent: oklch(52% 0.17 28);
-  --color-accent-hover: oklch(46% 0.18 28);
-  --color-accent-bg: oklch(95% 0.025 28);
-  --color-focus: oklch(58% 0.15 28);
+  /* 语义色：橙红=遗忘（墨墨遗忘曲线同款），深蓝=学习数字，绿=完成 */
+  --color-forget: #d8562f;
+  --color-forget-bg: #fbeee9;
+  --color-vague: #b8771c;
+  --color-vague-bg: #f8f1e2;
+  --color-familiar: #2fa26b;
+  --color-familiar-bg: #e7f5ee;
+  --color-info: #2d4b73;
+  --color-info-bg: #e9eff6;
 
-  /* 阴影：柔和弥散，两层 */
-  --shadow-tile: 0 1px 2px oklch(23% 0.014 65 / 0.04), 0 6px 20px oklch(23% 0.014 65 / 0.05);
-  --shadow-tile-hover: 0 2px 4px oklch(23% 0.014 65 / 0.05), 0 14px 36px oklch(23% 0.014 65 / 0.1);
-  --shadow-pop: 0 4px 12px oklch(23% 0.014 65 / 0.08), 0 20px 48px oklch(23% 0.014 65 / 0.12);
+  /* 阴影：扁平轻弥散，单层 */
+  --shadow-tile: 0 1px 2px rgb(31 42 39 / 0.04);
+  --shadow-tile-hover: 0 2px 8px rgb(31 42 39 / 0.09);
+  --shadow-pop: 0 4px 16px rgb(31 42 39 / 0.12);
 
-  --font-display: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
+  /* 显示字与正文同一无衬线栈（墨墨 App 同款轻盈气质），数字保留 mono */
+  --font-display: 'IBM Plex Sans', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 
@@ -51,18 +56,56 @@
   --text-xl: clamp(1.5625rem, 1.45rem + 0.8vw, 1.875rem);
   --text-3xl: clamp(2.4375rem, 2.1rem + 1.8vw, 3.25rem);
 
-  /* Bento 几何：圆角放大 */
+  /* 圆角：墨墨式友好圆润 */
   --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============ 夜间模式：同名 token 全量覆盖（继承到所有 var() 引用点） ============ */
+html.dark
+{
+  --color-bg: #0e1513;
+  --color-bg-subtle: #18211e;
+  --color-surface: #141c1a;
+  --color-border: #24302c;
+  --color-border-strong: #35453f;
+
+  --color-text: #e3eae7;
+  --color-text-muted: #a3b4ae;
+  --color-text-subtle: #748781;
+
+  --color-accent: #36cfae;
+  --color-accent-hover: #52dbc0;
+  --color-accent-bg: #1a3b34;
+  --color-focus: #36cfae;
+
+  --color-forget: #e8683b;
+  --color-forget-bg: #3a241b;
+  --color-vague: #d9a23f;
+  --color-vague-bg: #362b18;
+  --color-familiar: #4cc38a;
+  --color-familiar-bg: #17301f;
+  --color-info: #8fb4dc;
+  --color-info-bg: #1b2a3a;
+
+  --shadow-tile: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-tile-hover: 0 2px 8px rgb(0 0 0 / 0.45);
+  --shadow-pop: 0 4px 16px rgb(0 0 0 / 0.55);
 }
 
 html
 {
   background: var(--color-bg);
+  color-scheme: light;
+}
+
+html.dark
+{
+  color-scheme: dark;
 }
 
 body
@@ -119,7 +162,7 @@ body
 
 @layer components
 {
-  /* 瓷贴基座：白卡 + 细边 + 柔影，hover 轻抬 */
+  /* 瓷贴基座：白卡 + 细边 + 轻影（墨墨式扁平），hover 轻抬 */
   .tile
   {
     border-radius: var(--radius-lg);
