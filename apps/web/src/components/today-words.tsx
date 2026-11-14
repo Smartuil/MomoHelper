@@ -120,17 +120,19 @@ export function TodayWordsCard({ words }: { words: TodayWordRowDto[] })
                 <span className="tabular font-[family-name:var(--font-mono)] text-[var(--text-xs)] text-[var(--color-text-subtle)]">
                   {i + 1}
                 </span>
-                <span className="min-w-0 truncate">
-                  <span className="font-[family-name:var(--font-display)] text-[var(--text-md)]">
-                    {word.spelling}
-                  </span>
-                  {word.isNew && (
-                    <span className="ml-2 rounded-full bg-[var(--color-accent-bg)] px-2 py-0.5 text-[var(--text-xs)] font-medium text-[var(--color-accent)]">
-                      新词
-                    </span>
-                  )}
+                <span className="min-w-0 truncate font-[family-name:var(--font-display)] text-[var(--text-md)]">
+                  {word.spelling}
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
+                  <span
+                    className={`text-[var(--text-xs)] ${
+                      word.isNew
+                        ? 'font-medium text-[var(--color-accent)]'
+                        : 'text-[var(--color-text-muted)]'
+                    }`}
+                  >
+                    {word.isNew ? '新词' : '复习'}
+                  </span>
                   <span
                     className={`flex items-center gap-1.5 text-[var(--text-xs)] ${
                       word.isFinished
