@@ -51,7 +51,16 @@ function formatTime(iso: string): string
 }
 
 /** 诊断结果展示（右栏面板 / 移动端展开共用） */
-function DiagnosisBody({ record }: { record: DiagnoseRecord })
+/** 诊断结果展示（右栏面板 / 移动端展开共用）；onRediagnose 供已诊断的词重新诊断 */
+function DiagnosisBody({
+  record,
+  onRediagnose,
+  busy = false
+}: {
+  record: DiagnoseRecord
+  onRediagnose?: () => void
+  busy?: boolean
+})
 {
   return (
     <>
@@ -59,8 +68,24 @@ function DiagnosisBody({ record }: { record: DiagnoseRecord })
         <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)]">
           {record.spelling}
         </p>
-        <span className="rounded-full bg-[var(--color-vague-bg)] px-2.5 py-0.5 text-[var(--text-xs)] font-medium text-[var(--color-vague)]">
-          {REASON_LABELS[record.data.reason] ?? record.data.reason}
+        <span className="flex items-center gap-2">
+          <span className="rounded-full bg-[var(--color-vague-bg)] px-2.5 py-0.5 text-[var(--text-xs)] font-medium text-[var(--color-vague)]">
+            {REASON_LABELS[record.data.reason] ?? record.data.reason}
+          </span>
+          {onRediagnose && (
+            <button
+              type="button"
+              onClick={onRediagnose}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border)] px-2.5 py-1 text-[var(--text-xs)] text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)] disabled:opacity-50"
+            >
+              <Icon
+                name="refresh"
+                className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`}
+              />
+              重新诊断
+            </button>
+          )}
         </span>
       </div>
       <p className="mt-2.5 text-[var(--text-sm)] leading-relaxed">{record.data.explanation}</p>
@@ -151,6 +176,19 @@ export default function ForgetPage()
   /** 选中词最近一次诊断是否失败 */
   const isFailedSelected = diagnose.isError && diagnose.variables?.spelling === selected
 
+  /** 对指定词发起诊断（点选与重新诊断共用）；思考模式未选时引导先选 */
+  function requestDiagnosis(spelling: string): void
+  {
+    if (!thinking)
+    {
+      setModeNotice('请先选择思考模式：开启诊断更深入，关闭诊断更快')
+      return
+    }
+
+    setModeNotice(null)
+    diagnose.mutate({ spelling, thinking: thinking === 'on' })
+  }
+
   function selectWord(spelling: string): void
   {
     setSelected(spelling)
@@ -160,15 +198,7 @@ export default function ForgetPage()
       return
     }
 
-    // 未选思考模式时引导先选；有历史则直接回看，不触发请求
-    if (!thinking)
-    {
-      setModeNotice('请先选择思考模式：开启诊断更深入，关闭诊断更快')
-      return
-    }
-
-    setModeNotice(null)
-    diagnose.mutate({ spelling, thinking: thinking === 'on' })
+    requestDiagnosis(spelling)
   }
 
   return (
@@ -307,7 +337,14 @@ export default function ForgetPage()
                                 }
                               />
                             ) : record ? (
-                              <DiagnosisBody record={record} />
+                              <DiagnosisBody
+                                record={record}
+                                onRediagnose={() => requestDiagnosis(word.spelling)}
+                                busy={
+                                  diagnose.isPending &&
+                                  diagnose.variables?.spelling === word.spelling
+                                }
+                              />
                             ) : (
                               <p className="text-[var(--text-sm)] text-[var(--color-text-subtle)]">
                                 准备诊断…
@@ -354,7 +391,13 @@ export default function ForgetPage()
                       )}
                     </div>
                   ) : currentRecord ? (
-                    <DiagnosisBody record={currentRecord} />
+                    <DiagnosisBody
+                      record={currentRecord}
+                      onRediagnose={() => selected && requestDiagnosis(selected)}
+                      busy={
+                        diagnose.isPending && diagnose.variables?.spelling === selected
+                      }
+                    />
                   ) : (
                     <div className="flex h-40 flex-col items-center justify-center text-center">
                       <Icon name="trending-down" className="h-7 w-7 text-[var(--color-text-subtle)]" />
