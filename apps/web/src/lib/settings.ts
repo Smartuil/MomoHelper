@@ -10,7 +10,8 @@
 const STORAGE_KEYS = {
   maimemoToken: 'momo.maimemoToken',
   tokenBoundAt: 'momo.tokenBoundAt',
-  deepseekKey: 'momo.deepseekKey'
+  deepseekKey: 'momo.deepseekKey',
+  aiThinking: 'momo.aiThinking'
 } as const
 
 export interface MaimemoTokenStatus
@@ -103,6 +104,28 @@ export function setDeepSeekKey(key: string): void
 export function clearDeepSeekKey(): void
 {
   remove(STORAGE_KEYS.deepseekKey)
+}
+
+// ============================ AI 思考模式 ============================
+
+/** 思考模式只有开 / 关两种取值；null = 用户尚未选择 */
+export type AiThinkingMode = 'on' | 'off'
+
+/**
+ * 读取用户选择的思考模式。
+ * 代码不做任何默认：未选择返回 null，由页面引导用户先选择再发起 AI 请求。
+ */
+export function getAiThinkingMode(): AiThinkingMode | null
+{
+  const value = read(STORAGE_KEYS.aiThinking)
+
+  return value === 'on' || value === 'off' ? value : null
+}
+
+/** 记录用户选择（问词页 / 遗忘词页共用同一份偏好，选择一次全局生效） */
+export function setAiThinkingMode(mode: AiThinkingMode): void
+{
+  write(STORAGE_KEYS.aiThinking, mode)
 }
 
 /**

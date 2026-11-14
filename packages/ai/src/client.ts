@@ -2,12 +2,16 @@
  * DeepSeek 客户端（OpenAI 兼容协议，原生 fetch 实现）。
  *
  * 不引入 openai SDK，保持依赖体积精简。
- * 模型分配：
- *   - 遗忘原因推测 → deepseek-reasoner
- *   - AI 问词（交互式流式）→ deepseek-chat
+ * 模型分配（deepseek-chat / deepseek-reasoner 已于 2026-07-24 停止使用）：
+ *   - 遗忘原因推测 → deepseek-v4-pro
+ *   - AI 问词（交互式流式）→ deepseek-flash
+ *
+ * 思考模式不做代码默认：是否开启由用户在页面上选择后经调用方显式传入
+ * （thinking: true / false）；未传时请求不带 thinking 字段，走服务端默认。
+ * 开启思考时 temperature 不生效（官方限制，但不会报错）。
  */
 
-export type AiModel = 'deepseek-chat' | 'deepseek-reasoner'
+export type AiModel = 'deepseek-flash' | 'deepseek-v4-pro'
 
 /** Key 无效 / 无权限：设置页保存前校验失败走这里，与「接口不可用」区分开 */
 export class AiAuthError extends Error
@@ -51,6 +55,12 @@ export interface CompletionParams
   temperature?: number
   /** 中止信号：浏览器端「停止生成」用，abort 时 fetch 抛 AbortError */
   signal?: AbortSignal
+  /**
+   * 思考模式开关，由用户在页面上显式选择（代码不做默认）：
+   * true / false 作为 thinking.type 发送；不传则不带该字段，走服务端默认。
+   * 开启思考时 temperature 不生效（官方限制，但不会报错）。
+   */
+  thinking?: boolean
 }
 
 export interface CompletionResult
@@ -85,6 +95,9 @@ export class AiClient
         messages: params.messages,
         max_tokens: params.maxTokens,
         temperature: params.temperature,
+        ...(params.thinking === undefined
+          ? {}
+          : { thinking: { type: params.thinking ? 'enabled' : 'disabled' } }),
         ...(params.jsonMode ? { response_format: { type: 'json_object' } } : {})
       })
     })
@@ -153,9 +166,10 @@ export class AiClient
     }
 
     await this.complete({
-      model: 'deepseek-chat',
+      model: 'deepseek-flash',
       messages: [{ role: 'user', content: 'ping' }],
-      maxTokens: 1
+      maxTokens: 1,
+      thinking: false
     })
   }
 
@@ -177,6 +191,9 @@ export class AiClient
         messages: params.messages,
         max_tokens: params.maxTokens,
         temperature: params.temperature,
+        ...(params.thinking === undefined
+          ? {}
+          : { thinking: { type: params.thinking ? 'enabled' : 'disabled' } }),
         stream: true
       })
     })

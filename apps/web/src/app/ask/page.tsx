@@ -3,13 +3,19 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Icon } from '@/components/icons'
-import { ErrorNote, PageHeader, Tile } from '@/components/kit'
+import { ErrorNote, PageHeader, Segmented, Tile } from '@/components/kit'
 import { askStream } from '@/lib/ai'
+import {
+  getAiThinkingMode,
+  setAiThinkingMode,
+  type AiThinkingMode
+} from '@/lib/settings'
 
 /**
  * AI 问词：浏览器直连 DeepSeek 流式接口。
  * 回答自动注入该词的真实学习数据（学习次数 / 顽固标记）；
  * 未绑定墨墨时也能提问，只是缺少学习上下文。
+ * 思考模式由用户在此页选择（开 / 关），不设默认，选择会记住。
  */
 export default function AskPage()
 {
@@ -18,6 +24,8 @@ export default function AskPage()
   const [answer, setAnswer] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** null = 用户还没选过思考模式（localStorage 无记录） */
+  const [thinking, setThinking] = useState<AiThinkingMode | null>(null)
 
   const answerRef = useRef('')
   const abortRef = useRef<AbortController | null>(null)
@@ -31,6 +39,22 @@ export default function AskPage()
     []
   )
 
+  // 挂载后读取已保存的选择（localStorage 仅浏览器可用）
+  useEffect(
+    () =>
+    {
+      setThinking(getAiThinkingMode())
+    },
+    []
+  )
+
+  function chooseThinking(mode: AiThinkingMode): void
+  {
+    setThinking(mode)
+    setAiThinkingMode(mode)
+    setError(null)
+  }
+
   function stop(): void
   {
     abortRef.current?.abort()
@@ -42,6 +66,13 @@ export default function AskPage()
 
     if (!text || busy)
     {
+      return
+    }
+
+    // 思考模式不设默认：未选择时引导用户先选
+    if (!thinking)
+    {
+      setError('请先选择思考模式：开启回答更深入，关闭回答更快')
       return
     }
 
@@ -58,6 +89,7 @@ export default function AskPage()
       await askStream(
         text,
         spelling.trim() || undefined,
+        thinking === 'on',
         (delta) =>
         {
           answerRef.current += delta
@@ -133,7 +165,7 @@ export default function AskPage()
             {question.length} / 500
           </p>
 
-          <div className="mt-2 flex gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             <button
               type="submit"
               disabled={busy || !question.trim()}
@@ -151,6 +183,26 @@ export default function AskPage()
                 停止
               </button>
             )}
+            <div className="ml-auto flex items-center gap-2.5">
+              <span className="text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+                思考模式{thinking ? '' : '（未选择）'}
+              </span>
+              <Segmented
+                ariaLabel="思考模式"
+                value={thinking ?? ''}
+                options={[
+                  ['on', '开'],
+                  ['off', '关']
+                ]}
+                onChange={(next) =>
+                {
+                  if (next === 'on' || next === 'off')
+                  {
+                    chooseThinking(next)
+                  }
+                }}
+              />
+            </div>
           </div>
         </form>
       </Tile>

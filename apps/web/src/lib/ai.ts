@@ -89,10 +89,12 @@ async function findRecordContext(spelling: string): Promise<AskContext>
  * AI 问词（流式）：注入真实学习数据（学习次数 / 顽固标记）后逐段回调增量文本。
  * 墨墨侧 Token 与 DeepSeek 侧 Key 分别缺一时：Token 缺失仍可纯 AI 回答，
  * Key 缺失抛 AiNotConfiguredError 由 UI 引导。
+ * thinking 由用户在问词页选择（开 / 关），这里只透传，不做代码默认。
  */
 export async function askStream(
   question: string,
   spelling: string | undefined,
+  thinking: boolean,
   onDelta: (text: string) => void,
   signal?: AbortSignal
 ): Promise<void>
@@ -103,18 +105,19 @@ export async function askStream(
 
   await ai.streamComplete(
     {
-      model: 'deepseek-chat',
+      model: 'deepseek-flash',
       messages,
       maxTokens: 1200,
       temperature: 0.5,
+      thinking,
       signal
     },
     onDelta
   )
 }
 
-/** 遗忘原因诊断：deepseek-reasoner + 固定七枚举，结合真实学习记录（FR-3.6） */
-export async function diagnoseWord(spelling: string): Promise<ForgetDiagnosis>
+/** 遗忘原因诊断：deepseek-v4-pro + 固定七枚举，结合真实学习记录；思考模式由用户选择（FR-3.6） */
+export async function diagnoseWord(spelling: string, thinking: boolean): Promise<ForgetDiagnosis>
 {
   const ai = getAiClient()
 
@@ -145,6 +148,12 @@ export async function diagnoseWord(spelling: string): Promise<ForgetDiagnosis>
     // 学习数据不可用时继续诊断，上下文缺失由 prompt 容忍
   }
 
-  const generated = await diagnoseForget(ai, { spelling, studyCount, lastResponse, tags })
+  const generated = await diagnoseForget(ai, {
+    spelling,
+    thinking,
+    studyCount,
+    lastResponse,
+    tags
+  })
   return generated.data
 }

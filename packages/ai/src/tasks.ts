@@ -48,6 +48,8 @@ json 格式：
 export interface ForgetDiagnosisInput
 {
   spelling: string
+  /** 是否开启思考模式：由用户在遗忘词页选择，代码不做默认 */
+  thinking: boolean
   studyCount?: number
   lastResponse?: string
   tags?: string[]
@@ -59,7 +61,9 @@ export async function diagnoseForget(
 ): Promise<GenerationOutput<ForgetDiagnosis>>
 {
   const result = await client.complete({
-    model: 'deepseek-reasoner',
+    // V4-Pro 定位深度推理；思考模式由用户选择后经 thinking 透传
+    model: 'deepseek-v4-pro',
+    thinking: input.thinking,
     messages: [
       { role: 'system', content: FORGET_SYSTEM_PROMPT },
       {

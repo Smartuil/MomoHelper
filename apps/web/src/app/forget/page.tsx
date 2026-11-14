@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { ForgetDiagnosis } from '@momo/ai'
 import type { FocusWordDto } from '@momo/types'
@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons'
 import { EmptyTile, ErrorNote, PageHeader, Segmented, Tile, TileSkeleton } from '@/components/kit'
 import { diagnoseWord } from '@/lib/ai'
 import { getStickingWords, getTodayForgotten } from '@/lib/maimemo'
+import { getAiThinkingMode, setAiThinkingMode, type AiThinkingMode } from '@/lib/settings'
 
 const REASON_LABELS: Record<string, string> = {
   SPELLING_SIMILAR: '拼写相似',
@@ -33,11 +34,31 @@ const EMPTY_COPY: Record<Tab, { title: string; description: string }> = {
   }
 }
 
-/** 遗忘词分析：今日遗忘 / 顽固词 + AI 原因诊断（deepseek-reasoner） */
+/** 遗忘词分析：今日遗忘 / 顽固词 + AI 原因诊断（deepseek-v4-pro，思考模式由用户选择） */
 export default function ForgetPage()
 {
   const [tab, setTab] = useState<Tab>('today')
   const [diagnosis, setDiagnosis] = useState<{ word: string; data: ForgetDiagnosis } | null>(null)
+  /** null = 用户还没选过思考模式（localStorage 无记录） */
+  const [thinking, setThinking] = useState<AiThinkingMode | null>(null)
+  /** 未选思考模式就点诊断时的提示 */
+  const [modeNotice, setModeNotice] = useState<string | null>(null)
+
+  // 挂载后读取已保存的选择（localStorage 仅浏览器可用）
+  useEffect(
+    () =>
+    {
+      setThinking(getAiThinkingMode())
+    },
+    []
+  )
+
+  function chooseThinking(mode: AiThinkingMode): void
+  {
+    setThinking(mode)
+    setAiThinkingMode(mode)
+    setModeNotice(null)
+  }
 
   const query = useQuery({
     queryKey: ['forget', tab],
@@ -45,8 +66,9 @@ export default function ForgetPage()
   })
 
   const diagnose = useMutation({
-    mutationFn: (spelling: string) => diagnoseWord(spelling),
-    onSuccess: (data, spelling) => setDiagnosis({ word: spelling, data })
+    mutationFn: ({ spelling, thinking }: { spelling: string; thinking: boolean }) =>
+      diagnoseWord(spelling, thinking),
+    onSuccess: (data, variables) => setDiagnosis({ word: variables.spelling, data })
   })
 
   const words: FocusWordDto[] = query.data?.words ?? []
@@ -57,19 +79,39 @@ export default function ForgetPage()
         title="遗忘词分析"
         description="今日遗忘来自作答记录，顽固词来自墨墨官方多次遗忘标记"
         actions={
-          <Segmented
-            ariaLabel="范围"
-            value={tab}
-            options={[
-              ['today', '今日遗忘'],
-              ['sticking', '顽固词']
-            ]}
-            onChange={(next) =>
-            {
-              setTab(next)
-              setDiagnosis(null)
-            }}
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+              思考模式{thinking ? '' : '（未选择）'}
+            </span>
+            <Segmented
+              ariaLabel="思考模式"
+              value={thinking ?? ''}
+              options={[
+                ['on', '开'],
+                ['off', '关']
+              ]}
+              onChange={(next) =>
+              {
+                if (next === 'on' || next === 'off')
+                {
+                  chooseThinking(next)
+                }
+              }}
+            />
+            <Segmented
+              ariaLabel="范围"
+              value={tab}
+              options={[
+                ['today', '今日遗忘'],
+                ['sticking', '顽固词']
+              ]}
+              onChange={(next) =>
+              {
+                setTab(next)
+                setDiagnosis(null)
+              }}
+            />
+          </div>
         }
       />
 
@@ -85,6 +127,12 @@ export default function ForgetPage()
 
       {query.data && (
         <>
+          {modeNotice && (
+            <div className="mb-4">
+              <ErrorNote message={modeNotice} />
+            </div>
+          )}
+
           {query.data.degraded && (
             <p className="mb-4 flex items-center gap-2 rounded-md border border-[var(--color-vague)]/30 bg-[var(--color-vague-bg)] px-4 py-2.5 text-[var(--text-sm)] text-[var(--color-vague)]">
               <Icon name="alert" className="h-4 w-4 shrink-0" />
@@ -122,11 +170,25 @@ export default function ForgetPage()
                         </span>
                         <button
                           type="button"
-                          onClick={() => diagnose.mutate(word.spelling)}
+                          onClick={() =>
+                          {
+                            // 思考模式不设默认：未选择时引导用户先选
+                            if (!thinking)
+                            {
+                              setModeNotice('请先选择思考模式：开启诊断更深入，关闭诊断更快')
+                              return
+                            }
+
+                            setModeNotice(null)
+                            diagnose.mutate({
+                              spelling: word.spelling,
+                              thinking: thinking === 'on'
+                            })
+                          }}
                           disabled={diagnose.isPending}
                           className="rounded-md border border-[var(--color-border)] px-2.5 py-1 text-[var(--text-xs)] transition-colors hover:bg-[var(--color-bg-subtle)] disabled:opacity-50"
                         >
-                          {diagnose.isPending && diagnose.variables === word.spelling
+                          {diagnose.isPending && diagnose.variables?.spelling === word.spelling
                             ? '诊断中…'
                             : 'AI 诊断'}
                         </button>
