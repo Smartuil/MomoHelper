@@ -13,3 +13,9 @@ export { toBeijingDate, beijingToday, beijingDayStartUtc } from './time'
 export { getStudyProgress, getTodayItems, queryStudyRecords } from './study'
 export type { QueryStudyRecordsParams, QueryStudyRecordsResult } from './study'
 export { listNotepads } from './notepads'
+export {
+  getVocabularyBySpelling,
+  listInterpretations,
+  listPhrases
+} from './vocabulary'
+export type { MaimemoVocabulary, MaimemoInterpretation, MaimemoPhrase } from './vocabulary'

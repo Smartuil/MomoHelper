@@ -129,3 +129,46 @@ export function buildAskMessages(question: string, context?: AskContext)
     { role: 'user' as const, content: userContent }
   ]
 }
+
+/* ============================= 词条解释（点击单词弹卡片） ============================= */
+
+const EXPLAIN_SYSTEM_PROMPT = `你是英语词典助手。根据单词生成简洁的中文词条解释，输出 json。
+
+json 格式：
+{ "phonetic": "音标（国际音标，不确定给空字符串）", "definitions": "词性+中文释义，多项用；分隔，只列最常用的 2-4 项", "example": "一个简短英文例句", "exampleTranslation": "例句中文翻译" }
+
+要求：释义准确常见，不编造生僻义；只输出 json。`
+
+export const explainSchema = z.object({
+  phonetic: z.string().default(''),
+  definitions: z.string(),
+  example: z.string(),
+  exampleTranslation: z.string()
+})
+
+export type WordExplanation = z.infer<typeof explainSchema>
+
+/** 生成词条解释（词卡兜底数据源：优先展示墨墨自建内容，无自建时才调用） */
+export async function explainWord(
+  client: AiClient,
+  input: { spelling: string; thinking: boolean }
+): Promise<GenerationOutput<WordExplanation>>
+{
+  const result = await client.complete({
+    model: 'deepseek-flash',
+    thinking: input.thinking,
+    messages: [
+      { role: 'system', content: EXPLAIN_SYSTEM_PROMPT },
+      { role: 'user', content: `单词：${input.spelling}` }
+    ],
+    jsonMode: true,
+    maxTokens: 300,
+    temperature: 0.3
+  })
+
+  return {
+    data: explainSchema.parse(JSON.parse(result.content)),
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens
+  }
+}

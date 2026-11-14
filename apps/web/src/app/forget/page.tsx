@@ -7,6 +7,7 @@ import type { ForgetDiagnosis } from '@momo/ai'
 import type { FocusWordDto } from '@momo/types'
 import { Icon } from '@/components/icons'
 import { EmptyTile, ErrorNote, PageHeader, Segmented, Tile, TileSkeleton } from '@/components/kit'
+import { WordCardPopover } from '@/components/word-card'
 import { diagnoseWord } from '@/lib/ai'
 import {
   getDiagnoseHistory,
@@ -50,7 +51,33 @@ function formatTime(iso: string): string
   })
 }
 
-/** 诊断结果展示（右栏面板 / 移动端展开共用） */
+/** 可点击单词：点按弹词卡（墨墨自建优先，AI 兜底），点其他位置自动关闭 */
+function WordButton({
+  spelling,
+  className = ''
+}: {
+  spelling: string
+  className?: string
+})
+{
+  const [open, setOpen] = useState(false)
+
+  return (
+    <span className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        title="点击查看词条释义"
+        className={`underline decoration-[var(--color-border-strong)] decoration-dotted underline-offset-4 transition-colors hover:decoration-[var(--color-accent)] ${className}`}
+      >
+        {spelling}
+      </button>
+      {open && <WordCardPopover spelling={spelling} onClose={() => setOpen(false)} />}
+    </span>
+  )
+}
+
 /** 诊断结果展示（右栏面板 / 移动端展开共用）；onRediagnose 供已诊断的词重新诊断 */
 function DiagnosisBody({
   record,
@@ -65,9 +92,10 @@ function DiagnosisBody({
   return (
     <>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)]">
-          {record.spelling}
-        </p>
+        <WordButton
+          spelling={record.spelling}
+          className="font-[family-name:var(--font-display)] text-[var(--text-lg)]"
+        />
         <span className="flex items-center gap-2">
           <span className="rounded-full bg-[var(--color-vague-bg)] px-2.5 py-0.5 text-[var(--text-xs)] font-medium text-[var(--color-vague)]">
             {REASON_LABELS[record.data.reason] ?? record.data.reason}
@@ -358,38 +386,46 @@ export default function ForgetPage()
                 </ul>
               </Tile>
 
-              {/* 右栏：固定诊断面板（sticky，点词即换内容，不随列表滚动） */}
+              {/* 右栏：固定诊断面板（sticky，点词即换内容，不随列表滚动）。
+                  选中词在所有状态下都可点击弹词卡（已诊断时由 DiagnosisBody 承担） */}
               <div className="sticky top-6 hidden h-fit lg:block">
                 <Tile hover={false} index={2} className="min-h-[260px]">
-                  {isDiagnosingSelected ? (
-                    <div>
-                      <div className="h-6 w-28 animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
-                      <div className="mt-4 h-4 w-full animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
-                      <div className="mt-2.5 h-4 w-4/5 animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
-                      <div className="mt-2.5 h-4 w-3/5 animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
-                      <p className="mt-3 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
-                        {diagnose.variables?.spelling} 诊断中{diagnose.variables?.thinking ? '（深度思考，可能较慢）' : ''}…
-                      </p>
-                    </div>
-                  ) : isFailedSelected ? (
-                    <div>
-                      <ErrorNote
-                        message={
-                          diagnose.error instanceof Error
-                            ? diagnose.error.message
-                            : '诊断失败，请稍后重试'
-                        }
+                  {isDiagnosingSelected || isFailedSelected ? (
+                    <>
+                      <WordButton
+                        spelling={selected ?? ''}
+                        className="font-[family-name:var(--font-display)] text-[var(--text-lg)]"
                       />
-                      {selected && (
-                        <button
-                          type="button"
-                          onClick={() => diagnose.mutate({ spelling: selected, thinking: thinking === 'on' })}
-                          className="mt-3 inline-flex h-8 items-center rounded-md border border-[var(--color-border-strong)] px-4 text-[var(--text-sm)] transition-colors hover:bg-[var(--color-bg-subtle)]"
-                        >
-                          重试
-                        </button>
+                      {isDiagnosingSelected ? (
+                        <div className="mt-3">
+                          <div className="h-4 w-full animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
+                          <div className="mt-2.5 h-4 w-4/5 animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
+                          <div className="mt-2.5 h-4 w-3/5 animate-pulse rounded-sm bg-[var(--color-bg-subtle)]" />
+                          <p className="mt-3 text-[var(--text-xs)] text-[var(--color-text-subtle)]">
+                            诊断中{diagnose.variables?.thinking ? '（深度思考，可能较慢）' : ''}…
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="mt-3">
+                          <ErrorNote
+                            message={
+                              diagnose.error instanceof Error
+                                ? diagnose.error.message
+                                : '诊断失败，请稍后重试'
+                            }
+                          />
+                          {selected && (
+                            <button
+                              type="button"
+                              onClick={() => requestDiagnosis(selected)}
+                              className="mt-3 inline-flex h-8 items-center rounded-md border border-[var(--color-border-strong)] px-4 text-[var(--text-sm)] transition-colors hover:bg-[var(--color-bg-subtle)]"
+                            >
+                              重试
+                            </button>
+                          )}
+                        </div>
                       )}
-                    </div>
+                    </>
                   ) : currentRecord ? (
                     <DiagnosisBody
                       record={currentRecord}
@@ -398,6 +434,18 @@ export default function ForgetPage()
                         diagnose.isPending && diagnose.variables?.spelling === selected
                       }
                     />
+                  ) : selected ? (
+                    <>
+                      <WordButton
+                        spelling={selected}
+                        className="font-[family-name:var(--font-display)] text-[var(--text-lg)]"
+                      />
+                      <p className="mt-3 text-[var(--text-sm)] text-[var(--color-text-subtle)]">
+                        {history.has(selected.toLowerCase())
+                          ? '正在载入历史诊断…'
+                          : '尚未诊断，点左侧词触发诊断；上方单词可点开词条'}
+                      </p>
+                    </>
                   ) : (
                     <div className="flex h-40 flex-col items-center justify-center text-center">
                       <Icon name="trending-down" className="h-7 w-7 text-[var(--color-text-subtle)]" />

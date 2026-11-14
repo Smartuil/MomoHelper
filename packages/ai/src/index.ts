@@ -9,11 +9,14 @@ export type {
 export {
   forgetReasonSchema,
   diagnoseForget,
-  buildAskMessages
+  buildAskMessages,
+  explainWord,
+  explainSchema
 } from './tasks'
 export type {
   ForgetDiagnosis,
   ForgetDiagnosisInput,
   AskContext,
-  GenerationOutput
+  GenerationOutput,
+  WordExplanation
 } from './tasks'
