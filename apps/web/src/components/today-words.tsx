@@ -12,7 +12,6 @@ import { Segmented } from '@/components/kit'
  */
 
 type FinishFilter = 'all' | 'finished' | 'unfinished'
-type TypeFilter = 'all' | 'new' | 'review'
 
 const RESPONSE_LABELS: Record<StudyResponse, { label: string; className: string }> = {
   FORGET: {
@@ -32,7 +31,6 @@ const RESPONSE_LABELS: Record<StudyResponse, { label: string; className: string 
 export function TodayWordsCard({ words }: { words: TodayWordRowDto[] })
 {
   const [finishFilter, setFinishFilter] = useState<FinishFilter>('all')
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
   const filtered = useMemo(
     () =>
@@ -48,19 +46,9 @@ export function TodayWordsCard({ words }: { words: TodayWordRowDto[] })
           return false
         }
 
-        if (typeFilter === 'new' && !word.isNew)
-        {
-          return false
-        }
-
-        if (typeFilter === 'review' && word.isNew)
-        {
-          return false
-        }
-
         return true
       }),
-    [words, finishFilter, typeFilter]
+    [words, finishFilter]
   )
 
   return (
@@ -82,16 +70,6 @@ export function TodayWordsCard({ words }: { words: TodayWordRowDto[] })
               ['unfinished', '未完成']
             ]}
             onChange={(next) => setFinishFilter(next as FinishFilter)}
-          />
-          <Segmented
-            ariaLabel="类型"
-            value={typeFilter}
-            options={[
-              ['all', '全部'],
-              ['new', '新词'],
-              ['review', '复习']
-            ]}
-            onChange={(next) => setTypeFilter(next as TypeFilter)}
           />
         </div>
       </div>
